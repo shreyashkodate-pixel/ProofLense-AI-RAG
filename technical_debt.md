@@ -47,24 +47,46 @@
 | **TD-04** | **In-Process BackgroundTasks vs Distributed Queue** | Low | Document ingestion currently runs via FastAPI's built-in `BackgroundTasks` within the server event loop. If the server restarts during ingestion, the job must wait for `RecoveryWatchdog` to time it out after 600s. | For enterprise scale beyond MVP, transition to a Redis-backed queue (ARQ or Celery) with persistent job states. |
 | **TD-05** | **Encrypted / Password-Protected PDFs** | Low | Encrypted PDFs fail with `PDFParsingError("Malformed or unreadable PDF: ...")`. No UI modal exists to input document passwords. | Documented MVP limitation; future enhancement can support user password inputs during upload. |
 | **TD-06** | **In-Memory Heuristic Rate Limiter** | Low | Sliding-window rate limiter stores request timestamps in memory per IP address. In multi-instance deployments, counters are not shared. | In production multi-pod deployments, transition rate limiting to Redis or edge CDN rate limiting (Cloudflare/Render). |
+| **TD-07** | **Live Cloud Evaluation Adapters** | Low | Evaluation runner intentionally guards `--live` with `NotImplementedError` and exit code 2. Evaluations currently run deterministically against synthetic fixtures (`--offline`). | Provision live database and Gemini API evaluation adapters during Phase 11 production deployment testing. |
+| **TD-08** | **Local Filesystem Storage vs Cloud Object Storage** | Medium | Ingestion pipeline currently stores PDF uploads in local `./data/uploads/` directory. | Implement Supabase Storage or S3-compatible cloud object store driver before multi-pod Render deployment. |
 
 ---
 
-## 3. Upcoming Phase Roadmap
+## 3. Milestone Completion Status & Upcoming Roadmap
 
+### Completed Milestones
+- **Phase 1: Backend Scaffolding, Security & Configuration [COMPLETED]**
+- **Phase 2: Relational Schema & pgvector Architecture [COMPLETED]**
+- **Phase 3: Workspaces, Storage & Resilient Ingestion APIs [COMPLETED]**
+- **Phase 4: PDF Extraction & Page-Aware Chunking Pipeline [COMPLETED]**
 - **Phase 5: Gemini Embeddings & Vector Storage [COMPLETED]**
-  - Integrated official Google GenAI SDK (`google-genai>=2.0.0,<3.0.0`) for `gemini-embedding-2` configured with 768 output dimensions (`EMBEDDING_DIMENSIONS=768`) via Matryoshka Representation Learning (MRL).
-  - Implemented bounded batch generation (`GEMINI_EMBEDDING_BATCH_SIZE=50`), mathematical vector validation, and exponential backoff retry policies.
-  - Persisted embeddings to `document_chunks.embedding` using existing HNSW index (`vector_cosine_ops`).
-  - Integrated into ingestion worker with decoupled transaction boundaries and resume-on-retry semantics.
-- **Phase 6: Semantic Retrieval, Grounded Q&A & Citation Validation**
-  - Workspace-scoped cosine similarity vector search (`<=>`) on `document_chunks.embedding`.
-  - Assemble evidence prompts with prompt-injection defense boundaries.
-  - Query `gemini-3.8-flash` with structured Pydantic outputs (`AnswerResponseSchema`).
-  - Server-side citation verification against retrieved passages.
-  - Enforce explicit abstention when retrieved evidence similarity falls below `RAG_MIN_SIMILARITY_THRESHOLD`.
-- **Phase 7: Cross-Document Comparison & Premium Next.js UI**
-  - Next.js 14+ App Router frontend with dark-mode aesthetic design tokens.
+  - Integrated official Google GenAI SDK (`gemini-embedding-2`, 768 output dimensions, MRL).
+  - Bounded batch generation, mathematical vector validation, exponential backoff retries.
+  - Decoupled transaction boundaries and resume-on-retry semantics.
+- **Phase 6 & 6.1: Grounded Q&A & Deterministic Citation Validation [COMPLETED]**
+  - Workspace-scoped cosine similarity vector retrieval (`<=>`) on `document_chunks.embedding`.
+  - Structured grounded synthesis using `gemini-3.8-flash` with XML evidence isolation and prompt-injection defenses.
+  - Server-authoritative `CitationValidator` (100% resolution to PostgreSQL chunks; stripped hallucinations; 0 citations forces abstention).
+  - Resolved Phase 6.1 candidate alias collisions and UUID mapping.
+- **Phase 7 & 7.1: Cross-Document Comparison & Evidence Sufficiency [COMPLETED]**
+  - Multi-document comparison engine with dual-source validation requirement for `agreement` / `contradiction`.
+  - Global evidence sufficiency evaluation and Stage 2 noise filtering (`< 0.65` discarded before LLM synthesis).
+  - Safe unambiguous `not_found` document attribution.
+- **Phase 10 & 10.1: Security Hardening, AI Evaluation Suite & Live Safety Guard [COMPLETED]**
+  - Curated 25-case benchmark across Factual (10), Comparison (5), and Negative (10) categories.
+  - Exact metric calculations, nearest-rank P95 latencies, and 5-point comparison rubric.
+  - CLI runner with terminal summary tables, JSON reports, and hard quality gate exit codes.
+  - 10-vector adversarial prompt injection regression suite (100% attack resistance).
+  - Phase 10.1 `--live` safety guard rejecting unprovisioned live connections with actionable exit code 2.
+
+### Upcoming Phases
+- **Phase 8: Next.js Frontend Foundation & Ingestion UI**
+  - Next.js (App Router, TypeScript, Vanilla CSS design tokens).
+  - Workspace manager, drag-and-drop PDF upload, ingestion progress indicators.
+- **Phase 9: Grounded Q&A & Cross-Document Comparison UI**
   - Evidence & Citation inspector drawer with source text highlight.
-  - Cross-document comparison matrix.
+  - Multi-document comparison matrix view.
+- **Phase 11: Deployment Preparation & Production Hardening**
+  - Render backend configuration and Vercel frontend deployment.
+  - Supabase PostgreSQL + pgvector live connection verification.
 
