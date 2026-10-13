@@ -9,7 +9,7 @@ import hashlib
 import uuid
 from pathlib import Path
 from typing import List
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ from app.core.logging import logger
 from app.core.security import verify_access_passkey
 from app.repositories import document_repo, workspace_repo
 from app.schemas.document import DocumentResponse, UploadBatchResponse
+from app.services.ingestion.worker import schedule_ingestion_background_task
 from app.services.storage.base import BaseStorageService
 from app.services.storage.factory import get_storage_service
 
@@ -37,6 +38,7 @@ router = APIRouter(
 )
 async def upload_documents_endpoint(
     workspace_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(..., description="Multipart PDF files to upload"),
     db: AsyncSession = Depends(get_db),
     storage: BaseStorageService = Depends(get_storage_service),
@@ -149,6 +151,13 @@ async def upload_documents_endpoint(
                 status="pending",
             )
             uploaded_documents.append(doc_record)
+
+            # Schedule real background ingestion
+            background_tasks.add_task(
+                schedule_ingestion_background_task,
+                doc_record.id,
+                workspace_id,
+            )
         except IntegrityError:
             # Handle concurrent race condition tripping uq_workspace_content_hash
             await storage.delete_file(saved_storage_path)
@@ -270,6 +279,7 @@ async def delete_document_endpoint(
 async def retry_document_endpoint(
     workspace_id: uuid.UUID,
     document_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     """Manually retry ingestion for a failed document via atomic worker claiming."""
@@ -309,4 +319,10 @@ async def retry_document_endpoint(
             },
         )
 
+    # Schedule background ingestion execution
+    background_tasks.add_task(
+        schedule_ingestion_background_task,
+        document_id,
+        workspace_id,
+    )
     return claimed

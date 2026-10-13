@@ -6,11 +6,15 @@ atomic worker claims, duplicate hash detection, and safe row locking.
 
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
-from sqlalchemy import select, update
+from typing import List, Optional, Tuple
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.chunk import DocumentChunk
 from app.models.document import Document
+from app.models.page import DocumentPage
+from app.services.parsing.chunker import ChunkData
+from app.services.parsing.pdf_parser import ParsedPage
 
 
 async def create_document(
@@ -141,3 +145,121 @@ async def atomic_claim_worker(
         await session.commit()
         await session.refresh(claimed_doc)
     return claimed_doc
+
+
+async def persist_extracted_pages_and_chunks(
+    session: AsyncSession,
+    document_id: uuid.UUID,
+    pages: List[ParsedPage],
+    chunks: List[ChunkData],
+) -> Tuple[List[DocumentPage], List[DocumentChunk]]:
+    """Persist extracted physical pages and bounded chunks in a single transaction.
+
+    Guarantees idempotency on retry: cleans up any pre-existing pages/chunks
+    associated with this document before inserting fresh records.
+    """
+    # 1. Clean up existing chunks and pages (idempotency on retry)
+    await session.execute(
+        delete(DocumentChunk).where(DocumentChunk.document_id == document_id)
+    )
+    await session.execute(
+        delete(DocumentPage).where(DocumentPage.document_id == document_id)
+    )
+
+    # 2. Persist DocumentPage records
+    page_id_map: dict[int, uuid.UUID] = {}
+    created_pages: List[DocumentPage] = []
+
+    for page_data in pages:
+        page_id = uuid.uuid4()
+        page_id_map[page_data.page_number] = page_id
+        page_record = DocumentPage(
+            id=page_id,
+            document_id=document_id,
+            page_number=page_data.page_number,
+            raw_text=page_data.raw_text,
+            char_count=page_data.char_count,
+        )
+        session.add(page_record)
+        created_pages.append(page_record)
+
+    # 3. Persist DocumentChunk records
+    created_chunks: List[DocumentChunk] = []
+    for chunk_data in chunks:
+        page_id = page_id_map.get(chunk_data.page_number)
+        if not page_id:
+            continue
+        chunk_record = DocumentChunk(
+            id=uuid.uuid4(),
+            document_id=document_id,
+            page_id=page_id,
+            chunk_index=chunk_data.chunk_index,
+            chunk_text=chunk_data.chunk_text,
+            embedding_model="gemini-embedding-2",
+            token_count=chunk_data.token_count,
+        )
+        session.add(chunk_record)
+        created_chunks.append(chunk_record)
+
+    # 4. Update Document status to 'ready' and record page_count
+    await session.execute(
+        update(Document)
+        .where(Document.id == document_id)
+        .values(
+            status="ready",
+            page_count=len(pages),
+            error_message=None,
+        )
+    )
+
+    await session.commit()
+    return created_pages, created_chunks
+
+
+async def mark_document_failed(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    doc_id: uuid.UUID,
+    error_message: str,
+) -> None:
+    """Mark a document as failed with an explanatory error message."""
+    await session.execute(
+        update(Document)
+        .where(
+            Document.id == doc_id,
+            Document.workspace_id == workspace_id,
+        )
+        .values(
+            status="failed",
+            error_message=error_message,
+        )
+    )
+    await session.commit()
+
+
+async def get_document_pages(
+    session: AsyncSession,
+    document_id: uuid.UUID,
+) -> List[DocumentPage]:
+    """Retrieve all pages for a document ordered by page_number ascending."""
+    stmt = (
+        select(DocumentPage)
+        .where(DocumentPage.document_id == document_id)
+        .order_by(DocumentPage.page_number.asc())
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_document_chunks(
+    session: AsyncSession,
+    document_id: uuid.UUID,
+) -> List[DocumentChunk]:
+    """Retrieve all chunks for a document ordered by chunk_index ascending."""
+    stmt = (
+        select(DocumentChunk)
+        .where(DocumentChunk.document_id == document_id)
+        .order_by(DocumentChunk.chunk_index.asc())
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
