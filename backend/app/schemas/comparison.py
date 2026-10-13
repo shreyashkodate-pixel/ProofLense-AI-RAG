@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 import uuid
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.query import CitationResponse, RetrievedEvidenceResponse
 
@@ -97,3 +97,26 @@ class ComparisonResponse(BaseModel):
         description="All candidate evidence passages retrieved from PostgreSQL for this comparison.",
     )
     created_at: datetime = Field(..., description="UTC creation timestamp.")
+
+
+class SavedComparisonResponse(BaseModel):
+    """Saved historical comparison run retrieved from a workspace session."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    comparison_id: uuid.UUID = Field(..., description="Unique comparison execution UUID")
+    workspace_id: uuid.UUID = Field(..., description="Owning workspace UUID")
+    query_text: str = Field(..., description="Topic or comparison question")
+    status: str = Field(..., description="Execution status: completed or insufficient_evidence")
+    is_abstention: bool = Field(..., description="Whether comparison abstained")
+    top_score: Optional[float] = Field(None, description="Top evidence similarity score")
+    synthesis: str = Field(..., description="Narrative synthesis comparing documents")
+    citations: List[CitationResponse] = Field(
+        default_factory=list,
+        description="List of verified citations supporting this comparison",
+    )
+    retrieved_evidence: List[RetrievedEvidenceResponse] = Field(
+        default_factory=list,
+        description="List of retrieved evidence chunks",
+    )
+    created_at: datetime = Field(..., description="UTC creation timestamp")

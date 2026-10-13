@@ -38,7 +38,10 @@ class CitationResponse(BaseModel):
         None,
         description="UUID of the supporting chunk, or None if the underlying chunk has been tombstoned.",
     )
-    document_id: uuid.UUID = Field(..., description="UUID of the parent document")
+    document_id: Optional[uuid.UUID] = Field(
+        default=None,
+        description="UUID of the parent document, or None if the underlying chunk/document has been tombstoned.",
+    )
     document_filename: str = Field(..., description="Authoritative document filename from PostgreSQL")
     page_number: int = Field(..., description="Physical page number from PostgreSQL")
     quoted_snippet: str = Field(..., description="Exact supporting text snippet")

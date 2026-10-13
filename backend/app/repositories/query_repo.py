@@ -154,6 +154,7 @@ async def create_query_run(
     query_text: str,
     top_score: Optional[float] = None,
     status: str = "completed",
+    run_type: str = "query",
 ) -> QueryRun:
     """Create and persist a new query run record."""
     query_run = QueryRun(
@@ -161,6 +162,7 @@ async def create_query_run(
         query_text=query_text,
         top_score=top_score,
         status=status,
+        run_type=run_type,
     )
     session.add(query_run)
     await session.flush()
@@ -237,6 +239,7 @@ async def get_query_run_by_id(
     session: AsyncSession,
     workspace_id: uuid.UUID,
     query_run_id: uuid.UUID,
+    run_type: Optional[str] = None,
 ) -> Optional[QueryRun]:
     """Retrieve full query run with answer, citations, and evidence eagerly loaded."""
     stmt = (
@@ -246,12 +249,52 @@ async def get_query_run_by_id(
             QueryRun.workspace_id == workspace_id,
         )
         .options(
-            selectinload(QueryRun.answer).selectinload(Answer.citations),
-            selectinload(QueryRun.retrieved_evidence),
+            selectinload(QueryRun.answer).selectinload(Answer.citations).selectinload(Citation.chunk),
+            selectinload(QueryRun.retrieved_evidence).selectinload(RetrievedEvidence.chunk).selectinload(DocumentChunk.document),
+            selectinload(QueryRun.retrieved_evidence).selectinload(RetrievedEvidence.chunk).selectinload(DocumentChunk.page),
         )
     )
+    if run_type is not None:
+        stmt = stmt.where(QueryRun.run_type == run_type)
     result = await session.execute(stmt)
-    return result.scalar_one_or_none()
+    if hasattr(result, "scalar_one_or_none"):
+        return result.scalar_one_or_none()
+    rows = await _extract_rows_list(result)
+    return rows[0] if rows else None
+
+
+async def list_query_runs(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    run_type: str = "query",
+    limit: int = 50,
+    offset: int = 0,
+) -> List[QueryRun]:
+    """List query runs strictly scoped to the workspace, ordered by newest first."""
+    stmt = (
+        select(QueryRun)
+        .where(
+            QueryRun.workspace_id == workspace_id,
+            QueryRun.run_type == run_type,
+        )
+        .options(
+            selectinload(QueryRun.answer).selectinload(Answer.citations).selectinload(Citation.chunk),
+            selectinload(QueryRun.retrieved_evidence).selectinload(RetrievedEvidence.chunk).selectinload(DocumentChunk.document),
+            selectinload(QueryRun.retrieved_evidence).selectinload(RetrievedEvidence.chunk).selectinload(DocumentChunk.page),
+        )
+        .order_by(QueryRun.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await session.execute(stmt)
+    if hasattr(result, "scalars"):
+        scalars = result.scalars()
+        if hasattr(scalars, "all"):
+            rows = scalars.all()
+            if inspect.isawaitable(rows):
+                rows = await rows
+            return list(rows)
+    return await _extract_rows_list(result)
 
 
 async def search_candidates_per_document(
@@ -364,6 +407,7 @@ async def persist_comparison_run(
         query_text=query_text,
         top_score=top_score,
         status=status,
+        run_type="comparison",
     )
     session.add(query_run)
     await session.flush()

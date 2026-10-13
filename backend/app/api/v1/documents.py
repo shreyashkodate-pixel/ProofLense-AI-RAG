@@ -8,8 +8,8 @@ Protected by the Application-Level Access Passkey Gatekeeper.
 import hashlib
 import uuid
 from pathlib import Path
-from typing import List
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from typing import List, Optional
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,13 @@ from app.core.database import get_db
 from app.core.logging import logger
 from app.core.security import verify_access_passkey
 from app.repositories import document_repo, workspace_repo
-from app.schemas.document import DocumentResponse, UploadBatchResponse
+from app.schemas.document import (
+    DocumentChunkDetailResponse,
+    DocumentPageDetailResponse,
+    DocumentPagesResponse,
+    DocumentResponse,
+    UploadBatchResponse,
+)
 from app.services.ingestion.worker import schedule_ingestion_background_task
 from app.services.storage.base import BaseStorageService
 from app.services.storage.factory import get_storage_service
@@ -326,3 +332,225 @@ async def retry_document_endpoint(
         workspace_id,
     )
     return claimed
+
+
+@router.get(
+    "/{document_id}/file",
+    summary="Retrieve raw original PDF document for an authorized document",
+)
+async def get_document_file_endpoint(
+    workspace_id: uuid.UUID,
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    storage: BaseStorageService = Depends(get_storage_service),
+):
+    """Retrieve the original uploaded PDF file for an authorized document."""
+    document = await document_repo.get_document_by_id(db, workspace_id, document_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error_code": "RESOURCE_NOT_FOUND",
+                "message": f"Document '{document_id}' not found in workspace '{workspace_id}'.",
+                "details": {
+                    "workspace_id": str(workspace_id),
+                    "document_id": str(document_id),
+                },
+            },
+        )
+
+    file_bytes = await storage.get_file(document.storage_path)
+    if file_bytes is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error_code": "FILE_NOT_FOUND",
+                "message": f"Physical PDF file for document '{document_id}' was not found in storage.",
+                "details": {"storage_path": document.storage_path},
+            },
+        )
+
+    return Response(
+        content=file_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{document.filename}"',
+            "Content-Length": str(len(file_bytes)),
+        },
+    )
+
+
+@router.get(
+    "/{document_id}/pages",
+    response_model=DocumentPagesResponse,
+    summary="Retrieve extracted page text and chunk evidence metadata for a document",
+)
+async def get_document_pages_endpoint(
+    workspace_id: uuid.UUID,
+    document_id: uuid.UUID,
+    page_number: Optional[int] = Query(None, ge=1, description="Optional 1-indexed page number filter"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve extracted page text and chunk metadata for an authorized document."""
+    document = await document_repo.get_document_by_id(db, workspace_id, document_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error_code": "RESOURCE_NOT_FOUND",
+                "message": f"Document '{document_id}' not found in workspace '{workspace_id}'.",
+                "details": {
+                    "workspace_id": str(workspace_id),
+                    "document_id": str(document_id),
+                },
+            },
+        )
+
+    pages = await document_repo.get_document_pages_with_chunks(
+        session=db,
+        workspace_id=workspace_id,
+        document_id=document_id,
+        page_number=page_number,
+    )
+
+    page_responses: List[DocumentPageDetailResponse] = []
+    for page in pages:
+        chunk_responses = [
+            DocumentChunkDetailResponse(
+                id=chunk.id,
+                document_id=chunk.document_id,
+                page_id=chunk.page_id,
+                chunk_index=chunk.chunk_index,
+                chunk_text=chunk.chunk_text,
+                token_count=chunk.token_count,
+                page_number=page.page_number,
+            )
+            for chunk in (page.chunks or [])
+        ]
+        page_raw = getattr(page, "raw_text", getattr(page, "extracted_text", ""))
+        page_responses.append(
+            DocumentPageDetailResponse(
+                id=page.id,
+                document_id=page.document_id,
+                page_number=page.page_number,
+                raw_text=page_raw,
+                char_count=getattr(page, "char_count", len(page_raw)),
+                chunks=chunk_responses,
+            )
+        )
+
+    return DocumentPagesResponse(
+        document_id=document.id,
+        workspace_id=workspace_id,
+        total_pages=document.page_count or len(page_responses),
+        pages=page_responses,
+    )
+
+
+@router.get(
+    "/{document_id}/chunks/{chunk_id}",
+    response_model=DocumentChunkDetailResponse,
+    summary="Retrieve details and exact text for a single evidence chunk",
+)
+async def get_document_chunk_endpoint(
+    workspace_id: uuid.UUID,
+    document_id: uuid.UUID,
+    chunk_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve specific chunk details strictly verifying workspace and document scope."""
+    document = await document_repo.get_document_by_id(db, workspace_id, document_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error_code": "RESOURCE_NOT_FOUND",
+                "message": f"Document '{document_id}' not found in workspace '{workspace_id}'.",
+                "details": {
+                    "workspace_id": str(workspace_id),
+                    "document_id": str(document_id),
+                },
+            },
+        )
+
+    chunk = await document_repo.get_chunk_by_id(db, workspace_id, chunk_id)
+    if not chunk or chunk.document_id != document_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error_code": "RESOURCE_NOT_FOUND",
+                "message": f"Chunk '{chunk_id}' not found for document '{document_id}' in workspace '{workspace_id}'.",
+                "details": {
+                    "workspace_id": str(workspace_id),
+                    "document_id": str(document_id),
+                    "chunk_id": str(chunk_id),
+                },
+            },
+        )
+
+    page_number = chunk.page.page_number if chunk.page else None
+    return DocumentChunkDetailResponse(
+        id=chunk.id,
+        document_id=chunk.document_id,
+        page_id=chunk.page_id,
+        chunk_index=chunk.chunk_index,
+        chunk_text=chunk.chunk_text,
+        token_count=chunk.token_count,
+        page_number=page_number,
+    )
+
+
+# Dedicated router for direct chunk access within a workspace: /workspaces/{workspace_id}/chunks/{chunk_id}
+chunks_router = APIRouter(
+    prefix="/workspaces/{workspace_id}/chunks",
+    tags=["Chunks"],
+    dependencies=[Depends(verify_access_passkey)],
+)
+
+
+@chunks_router.get(
+    "/{chunk_id}",
+    response_model=DocumentChunkDetailResponse,
+    summary="Retrieve details and exact text for a chunk by chunk ID strictly within workspace scope",
+)
+async def get_chunk_by_id_endpoint(
+    workspace_id: uuid.UUID,
+    chunk_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve specific chunk details strictly verifying workspace scope."""
+    workspace = await workspace_repo.get_workspace(db, workspace_id)
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error_code": "RESOURCE_NOT_FOUND",
+                "message": f"Workspace '{workspace_id}' not found.",
+                "details": {"workspace_id": str(workspace_id)},
+            },
+        )
+
+    chunk = await document_repo.get_chunk_by_id(db, workspace_id, chunk_id)
+    if not chunk:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error_code": "RESOURCE_NOT_FOUND",
+                "message": f"Chunk '{chunk_id}' not found in workspace '{workspace_id}'.",
+                "details": {
+                    "workspace_id": str(workspace_id),
+                    "chunk_id": str(chunk_id),
+                },
+            },
+        )
+
+    page_number = chunk.page.page_number if chunk.page else None
+    return DocumentChunkDetailResponse(
+        id=chunk.id,
+        document_id=chunk.document_id,
+        page_id=chunk.page_id,
+        chunk_index=chunk.chunk_index,
+        chunk_text=chunk.chunk_text,
+        token_count=chunk.token_count,
+        page_number=page_number,
+    )

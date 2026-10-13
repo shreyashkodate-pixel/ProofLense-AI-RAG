@@ -31,6 +31,13 @@ class QueryRun(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     query_text: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="completed")
+    run_type: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="query",
+        server_default="query",
+        index=True,
+    )
     top_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     # Relationships

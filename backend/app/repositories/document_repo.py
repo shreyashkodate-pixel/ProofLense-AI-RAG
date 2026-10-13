@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 from sqlalchemy import delete, select, update
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chunk import DocumentChunk
@@ -396,3 +397,52 @@ async def get_documents_by_ids(
     )
     result = await session.execute(stmt)
     return await _extract_scalars_list(result)
+
+
+async def get_document_pages_with_chunks(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    document_id: uuid.UUID,
+    page_number: Optional[int] = None,
+) -> List[DocumentPage]:
+    """Retrieve document pages with their chunks, strictly scoped to workspace."""
+    stmt = (
+        select(DocumentPage)
+        .join(Document, Document.id == DocumentPage.document_id)
+        .where(
+            Document.workspace_id == workspace_id,
+            Document.id == document_id,
+        )
+        .options(selectinload(DocumentPage.chunks))
+        .order_by(DocumentPage.page_number.asc())
+    )
+    if page_number is not None:
+        stmt = stmt.where(DocumentPage.page_number == page_number)
+    result = await session.execute(stmt)
+    return await _extract_scalars_list(result)
+
+
+async def get_chunk_by_id(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    chunk_id: uuid.UUID,
+) -> Optional[Tuple[DocumentChunk, Document, DocumentPage]]:
+    """Retrieve a single chunk with document and page provenance, scoped to workspace."""
+    stmt = (
+        select(DocumentChunk, Document, DocumentPage)
+        .join(Document, Document.id == DocumentChunk.document_id)
+        .join(DocumentPage, DocumentPage.id == DocumentChunk.page_id)
+        .where(
+            Document.workspace_id == workspace_id,
+            DocumentChunk.id == chunk_id,
+        )
+    )
+    result = await session.execute(stmt)
+    if hasattr(result, "first"):
+        row = result.first()
+        if inspect.isawaitable(row):
+            row = await row
+        return row
+    rows = await _extract_scalars_list(result)
+    return rows[0] if rows else None
+

@@ -104,12 +104,14 @@ def upgrade() -> None:
         sa.Column("workspace_id", UUID(as_uuid=True), sa.ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
         sa.Column("query_text", sa.Text(), nullable=False),
         sa.Column("status", sa.String(50), nullable=False, server_default="completed"),
+        sa.Column("run_type", sa.String(50), nullable=False, server_default="query"),
         sa.Column("top_score", sa.Float(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
     op.create_index("ix_query_runs_id", "query_runs", ["id"])
     op.create_index("ix_query_runs_workspace_id", "query_runs", ["workspace_id"])
+    op.create_index("ix_query_runs_run_type", "query_runs", ["run_type"])
 
     # 7. Answers Table
     op.create_table(
