@@ -134,15 +134,17 @@ class RAGOrchestrator:
 
         top_score = candidates[0].similarity_score if candidates else None
 
-        # 4. Handle empty candidate set (e.g. no documents or no chunks in workspace)
-        if not candidates:
+        # 4. Two-stage evidence sufficiency evaluation (deterministic vector abstention)
+        threshold = self.settings.RAG_MIN_SIMILARITY_THRESHOLD
+        if not candidates or (top_score is not None and top_score < threshold):
             logger.info(
-                "No candidate chunks retrieved for workspace; abstaining cleanly",
-                extra={"extra": {"workspace_id": str(workspace_id)}},
+                "No candidate chunks retrieved or top score below threshold; abstaining cleanly",
+                extra={"extra": {"workspace_id": str(workspace_id), "top_score": top_score, "threshold": threshold}},
             )
             abstention_text = (
                 "I do not have sufficient document evidence in this workspace to answer your question."
             )
+
             # Persist query run and abstention answer in short transaction
             query_run = await query_repo.create_query_run(
                 session=session,

@@ -107,11 +107,54 @@ ProofLens AI is an enterprise-grade, evidence-first document intelligence platfo
     - [`backend/tests/integration/test_rag_pipeline.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/integration/test_rag_pipeline.py) (8 tests, including response citation ID regression)
   - **Test Metric:** 118/118 passing tests across all backend unit and integration suites (100% pass rate).
 
+#### Phase 7: Cross-Document Comparison (COMPLETED)
+- **Status:** Complete & Fully Verified.
+- **Core Deliverables:**
+  - **Evidence Sufficiency Evaluator (`EvidenceSufficiencyEvaluator`):**
+    - Located in [`backend/app/services/rag/abstention.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/rag/abstention.py).
+    - Implements deterministic vector abstention with configurable threshold (`RAG_MIN_SIMILARITY_THRESHOLD = 0.65`).
+    - Bypasses expensive LLM calls completely when no retrieved evidence meets the similarity threshold.
+    - Filters candidate chunks and provides canonical abstention messages for single Q&A and comparisons.
+  - **Cross-Document Pydantic Schemas:**
+    - Located in [`backend/app/schemas/comparison.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/schemas/comparison.py).
+    - Defines `ComparisonFindingType` enum (`agreement`, `contradiction`, `difference`, `not_found`).
+    - Defines `ComparisonRequest`, `PerDocumentEvidenceResponse`, `ComparisonFindingResponse`, and `ComparisonResponse`.
+  - **Balanced Per-Document Vector Retrieval & Comparison Persistence:**
+    - Located in [`backend/app/repositories/document_repo.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/repositories/document_repo.py) & [`backend/app/repositories/query_repo.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/repositories/query_repo.py).
+    - `get_ready_documents` and `get_documents_by_ids` for safe workspace-scoped document resolution.
+    - `search_candidates_per_document`: executes balanced retrieval allocating top-$k$ (default 3) candidates per compared document to prevent single-document evidence dominance.
+    - `persist_comparison_run`: atomically persists comparison runs and validated citations reusing existing `QueryRun`, `Answer`, `Citation`, and `RetrievedEvidence` tables without requiring schema changes or database migrations.
+  - **Gemini Comparison Generation Service:**
+    - Located in [`backend/app/services/ai/generator.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/ai/generator.py).
+    - `COMPARISON_SYSTEM_PROMPT` enforces explicit comparison taxonomy, multi-document grounding, untrusted document context, and honest reporting of missing info.
+    - `build_comparison_evidence_context` frames evidence with XML escaping and explicit document boundary provenance.
+    - `generate_comparison`: structured Pydantic output, exponential backoff retries, request timeouts, and zero secret leakage.
+  - **Server-Authoritative Comparison Finding & Citation Validator:**
+    - Located in [`backend/app/services/rag/validator.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/rag/validator.py).
+    - `validate_comparison_findings`: validates per-document evidence and top-level findings.
+    - **Contradiction / Agreement Verification Rule:** Requires validated citations from $\ge 2$ distinct documents. Automatically downgrades unverified contradictions/agreements to `difference` or `not_found`.
+    - **Metadata Overwriting:** Overwrites model-proposed filenames and page numbers with PostgreSQL ground-truth.
+    - **Deduplication & Hallucination Stripping:** Fabricated IDs and rank collisions stripped cleanly.
+    - **Abstention Policy:** Unsupported factual claims with zero valid citations force explicit abstention.
+  - **Comparator Orchestrator & API Router:**
+    - Orchestrator located in [`backend/app/services/comparison/comparator.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/comparison/comparator.py).
+    - Endpoint `POST /api/v1/workspaces/{workspace_id}/comparisons` in [`backend/app/api/v1/comparisons.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/api/v1/comparisons.py).
+    - Full security passkey protection (`verify_access_passkey`), RFC 7807 problem details error envelopes, decoupled LLM network calls outside DB locks, and accurate mapping of persisted `Citation.id` to API responses.
+  - **Unit and Integration Test Suites:**
+    - [`backend/tests/unit/test_abstention.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/unit/test_abstention.py) (13 tests, including order invariance regression tests)
+    - [`backend/tests/unit/test_comparison_validator.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/unit/test_comparison_validator.py) (17 tests, including safe not_found attribution regression tests)
+    - [`backend/tests/integration/test_comparisons.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/integration/test_comparisons.py) (12 tests, including Stage 2 chunk filtering and document order invariance)
+- **Phase 7.1 Audit Follow-Up Fixes (COMPLETED):**
+  - **Fix 1 (Global Evidence Sufficiency):** Resolved order-dependent false abstention bug in `abstention.py:55` by evaluating `top_score` as the true global maximum similarity score across all candidate chunks (`max((c.similarity_score for c in candidates), default=None)`).
+  - **Fix 2 (Stage 2 Chunk Filtering):** In `comparator.py`, applied `filter_passing_chunks()` using `RAG_MIN_SIMILARITY_THRESHOLD = 0.65` before assembling `<evidence_context>`, guaranteeing sub-threshold noise chunks ($< 0.65$) never reach the Gemini generation context. If no chunks pass Stage 2, comparator cleanly returns canonical insufficient-evidence abstention without calling Gemini.
+  - **Fix 3 (Safe `not_found` Document Attribution):** In `validator.py`, replaced arbitrary fallback to `documents[0]` with safe unambiguous inference: if exactly one authorized document remains unassigned for the finding, it is attributed to that document; otherwise, ambiguous or unrecognized per-document entries are omitted without fabricating document references.
+- **Test Metric:** 160/160 passing tests across all backend unit and integration suites (100% pass rate in 2.46s).
+
 ---
 
 ### Verification Metrics & Git History
 
-- **Test Suite Status:** 118 passed, 0 failed, 0 errors (`.venv/bin/pytest -v`).
+- **Test Suite Status:** 160 passed, 0 failed, 0 errors (`.venv/bin/pytest -v`).
 - **Formatting / Code Quality:** 0 lint/whitespace warnings (`git diff --check` clean).
 - **Security Check:** Zero secrets or credentials tracked or staged in git.
 - **Git Commit History:**
@@ -121,3 +164,5 @@ ProofLens AI is an enterprise-grade, evidence-first document intelligence platfo
   - `312e800`: `feat: complete Phase 3 workspaces and ingestion APIs`
   - `ee57c37`: `feat: implement PDF extraction and page-aware chunking`
   - `308b7f9`: `feat: implement Phase 5 embeddings and vector storage`
+  - `e7243c5`: `feat: implement Phase 6 grounded Q&A and citation validation`
+  - `cae1c07`: `fix(rag): resolve Phase 6.1 citation alias collision and response ID mapping`

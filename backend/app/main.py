@@ -11,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.v1.comparisons import router as comparisons_router
 from app.api.v1.documents import router as documents_router
 from app.api.v1.health import router as health_router
 from app.api.v1.queries import router as queries_router
@@ -87,6 +88,7 @@ def create_application() -> FastAPI:
     app.include_router(workspaces_router, prefix="/api/v1")
     app.include_router(documents_router, prefix="/api/v1")
     app.include_router(queries_router, prefix="/api/v1")
+    app.include_router(comparisons_router, prefix="/api/v1")
 
     # 5. Foundation Endpoints (Phase 1 Baseline)
     @app.get("/", tags=["Root"])

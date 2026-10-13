@@ -1,5 +1,7 @@
-"""ProofLens AI — RAG Orchestration and Citation Validation Package."""
-
+from app.services.rag.abstention import (
+    EvidenceSufficiencyEvaluator,
+    get_evidence_sufficiency_evaluator,
+)
 from app.services.rag.orchestrator import (
     RAGError,
     RAGPipelineError,
@@ -11,11 +13,16 @@ from app.services.rag.orchestrator import (
 from app.services.rag.validator import (
     CitationValidationResult,
     CitationValidator,
+    ComparisonValidationResult,
     ValidatedCitation,
+    ValidatedComparisonFinding,
+    ValidatedPerDocumentFinding,
     get_citation_validator,
 )
 
 __all__ = [
+    "EvidenceSufficiencyEvaluator",
+    "get_evidence_sufficiency_evaluator",
     "RAGError",
     "WorkspaceNotFoundError",
     "RAGPipelineError",
@@ -23,7 +30,10 @@ __all__ = [
     "RAGOrchestrator",
     "get_rag_orchestrator",
     "ValidatedCitation",
+    "ValidatedPerDocumentFinding",
+    "ValidatedComparisonFinding",
     "CitationValidationResult",
+    "ComparisonValidationResult",
     "CitationValidator",
     "get_citation_validator",
 ]

@@ -1,5 +1,12 @@
 """ProofLens AI Schemas Package."""
 
+from app.schemas.comparison import (
+    ComparisonFindingResponse,
+    ComparisonFindingType,
+    ComparisonRequest,
+    ComparisonResponse,
+    PerDocumentEvidenceResponse,
+)
 from app.schemas.document import DocumentResponse, UploadBatchResponse
 from app.schemas.query import (
     CitationResponse,
@@ -18,4 +25,9 @@ __all__ = [
     "QueryResponse",
     "CitationResponse",
     "RetrievedEvidenceResponse",
+    "ComparisonFindingType",
+    "ComparisonRequest",
+    "ComparisonResponse",
+    "ComparisonFindingResponse",
+    "PerDocumentEvidenceResponse",
 ]

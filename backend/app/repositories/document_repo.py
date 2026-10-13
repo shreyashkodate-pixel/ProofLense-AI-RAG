@@ -355,3 +355,44 @@ async def get_document_chunks(
     )
     result = await session.execute(stmt)
     return await _extract_scalars_list(result)
+
+
+async def get_ready_documents(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    limit: int = 5,
+) -> List[Document]:
+    """Retrieve all ready documents in a workspace up to a limit."""
+    stmt = (
+        select(Document)
+        .where(
+            Document.workspace_id == workspace_id,
+            Document.status == "ready",
+        )
+        .order_by(Document.created_at.desc())
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    return await _extract_scalars_list(result)
+
+
+async def get_documents_by_ids(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    doc_ids: List[uuid.UUID],
+) -> List[Document]:
+    """Retrieve documents in a workspace matching specific IDs.
+
+    Enforces workspace isolation: documents not belonging to workspace_id are excluded.
+    """
+    if not doc_ids:
+        return []
+    stmt = (
+        select(Document)
+        .where(
+            Document.workspace_id == workspace_id,
+            Document.id.in_(doc_ids),
+        )
+    )
+    result = await session.execute(stmt)
+    return await _extract_scalars_list(result)

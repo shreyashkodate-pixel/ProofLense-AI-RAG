@@ -252,3 +252,152 @@ async def get_query_run_by_id(
     )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def search_candidates_per_document(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    query_vector: List[float],
+    document_ids: List[uuid.UUID],
+    per_doc_k: int = 3,
+) -> List[CandidateChunk]:
+    """Retrieve top-K candidate chunks for each specified document in the workspace.
+
+    Guarantees:
+    1. Balanced cross-document representation: retrieves up to per_doc_k candidates from each document,
+       preventing any single document from crowding out another in the comparison context.
+    2. Cross-workspace isolation: joins Document and strictly filters Document.workspace_id == workspace_id.
+    3. Lifecycle validity: only searches chunks belonging to documents with status == 'ready'.
+    4. Null-embedding safety: excludes chunks without populated embeddings.
+    """
+    if not document_ids:
+        return []
+
+    cosine_dist = DocumentChunk.embedding.cosine_distance(query_vector)
+    all_candidates: List[CandidateChunk] = []
+    current_rank = 1
+
+    for doc_id in document_ids:
+        stmt = (
+            select(
+                DocumentChunk.id.label("chunk_id"),
+                DocumentChunk.chunk_text,
+                DocumentChunk.chunk_index,
+                Document.id.label("document_id"),
+                Document.filename.label("document_filename"),
+                DocumentPage.id.label("page_id"),
+                DocumentPage.page_number,
+                (1.0 - cosine_dist).label("similarity_score"),
+            )
+            .join(Document, Document.id == DocumentChunk.document_id)
+            .join(DocumentPage, DocumentPage.id == DocumentChunk.page_id)
+            .where(
+                Document.workspace_id == workspace_id,
+                Document.id == doc_id,
+                Document.status == "ready",
+                DocumentChunk.embedding.isnot(None),
+            )
+            .order_by(cosine_dist.asc())
+            .limit(per_doc_k)
+        )
+        result = await session.execute(stmt)
+        raw_rows = await _extract_rows_list(result)
+
+        for row in raw_rows:
+            if hasattr(row, "_mapping"):
+                m = row._mapping
+                chunk_id = m["chunk_id"]
+                chunk_text = m["chunk_text"]
+                chunk_index = m["chunk_index"]
+                document_id = m["document_id"]
+                document_filename = m["document_filename"]
+                page_id = m["page_id"]
+                page_number = m["page_number"]
+                sim_score = float(m["similarity_score"])
+            elif hasattr(row, "chunk_id"):
+                chunk_id = row.chunk_id
+                chunk_text = row.chunk_text
+                chunk_index = getattr(row, "chunk_index", 0)
+                document_id = row.document_id
+                document_filename = getattr(row, "document_filename", getattr(row, "filename", "document.pdf"))
+                page_id = getattr(row, "page_id", uuid.uuid4())
+                page_number = getattr(row, "page_number", 1)
+                sim_score = float(getattr(row, "similarity_score", 0.0))
+            elif isinstance(row, (tuple, list)) and len(row) >= 8:
+                chunk_id, chunk_text, chunk_index, document_id, document_filename, page_id, page_number, sim_score = row[:8]
+                sim_score = float(sim_score)
+            else:
+                continue
+
+            all_candidates.append(
+                CandidateChunk(
+                    chunk_id=chunk_id,
+                    chunk_text=chunk_text,
+                    chunk_index=chunk_index,
+                    document_id=document_id,
+                    document_filename=document_filename,
+                    page_id=page_id,
+                    page_number=page_number,
+                    similarity_score=sim_score,
+                    rank=current_rank,
+                )
+            )
+            current_rank += 1
+
+    return all_candidates
+
+
+async def persist_comparison_run(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    query_text: str,
+    top_score: Optional[float],
+    synthesis_text: str,
+    is_abstention: bool,
+    candidates: List[CandidateChunk],
+    citations_data: List[Dict[str, Any]],
+    status: str = "completed",
+) -> Tuple[QueryRun, Answer, List[Citation]]:
+    """Persist a cross-document comparison execution, evidence, and verified citations in a single transaction."""
+    query_run = QueryRun(
+        workspace_id=workspace_id,
+        query_text=query_text,
+        top_score=top_score,
+        status=status,
+    )
+    session.add(query_run)
+    await session.flush()
+
+    for candidate in candidates:
+        evidence = RetrievedEvidence(
+            query_run_id=query_run.id,
+            chunk_id=candidate.chunk_id,
+            similarity_score=candidate.similarity_score,
+            rank=candidate.rank,
+        )
+        session.add(evidence)
+
+    answer = Answer(
+        query_run_id=query_run.id,
+        answer_text=synthesis_text,
+        is_abstention=is_abstention,
+    )
+    session.add(answer)
+    await session.flush()
+
+    persisted_citations: List[Citation] = []
+    for cit_dict in citations_data:
+        citation = Citation(
+            answer_id=answer.id,
+            chunk_id=cit_dict.get("chunk_id"),
+            document_filename=cit_dict["document_filename"],
+            page_number=cit_dict["page_number"],
+            quoted_snippet=cit_dict["quoted_snippet"],
+        )
+        session.add(citation)
+        persisted_citations.append(citation)
+
+    await session.commit()
+    await session.refresh(query_run)
+    await session.refresh(answer)
+    return query_run, answer, persisted_citations
