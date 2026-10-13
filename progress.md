@@ -91,11 +91,27 @@ ProofLens AI is an enterprise-grade, evidence-first document intelligence platfo
     - Complete error handling: failures transition document to `failed` and rollback cleanly.
 - **Test Metric:** 94/94 passing tests across unit and integration suites (100% pass rate in 1.21s).
 
+- **Phase 6 & 6.1: Grounded Q&A, Citation Validation & Audit Fixes (COMPLETED)**
+  - Implemented `QueryRequest`, `QueryResponse`, `CitationResponse`, `RetrievedEvidenceResponse` in [`backend/app/schemas/query.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/schemas/query.py).
+  - Built `query_repo.py` in [`backend/app/repositories/query_repo.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/repositories/query_repo.py) providing workspace-scoped vector similarity retrieval via PostgreSQL/pgvector (`<=>` cosine distance operator) and atomic persistence for `QueryRun`, `RetrievedEvidence`, `Answer`, and snapshot `Citation` records.
+  - Built `GeminiGeneratorService` in [`backend/app/services/ai/generator.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/ai/generator.py) synthesizing answers using `gemini-3.8-flash` with structured Pydantic output, XML `<evidence_context>` prompt framing with entity escaping, and prompt-injection defense instructions.
+  - Built `CitationValidator` in [`backend/app/services/rag/validator.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/rag/validator.py) establishing deterministic server-authoritative citation validation (100% of API citations resolve to PostgreSQL chunks; model-supplied filenames/pages ignored; fabricated IDs stripped; factual answers with 0 citations force explicit abstention).
+  - Resolved Phase 6.1 Audit Follow-Up Findings:
+    - **Finding 1 (Citation Alias Collision):** Removed ambiguous `chunk_{chunk_index}` candidate alias in `validator.py`, preserving retrieval rank aliases (`chunk_{rank}`, `evidence_{rank}`, `{rank}`) and candidate UUIDs so every citation maps unambiguously to one server candidate.
+    - **Finding 2 (Persisted Citation ID):** Ensured `orchestrator.py` and `queries.py` map the actual persisted `Citation.id` from PostgreSQL into `CitationResponse`.
+  - Built `RAGOrchestrator` in [`backend/app/services/rag/orchestrator.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/rag/orchestrator.py) coordinating query embedding, vector retrieval, structured generation, citation validation, and transactional database persistence without holding open database locks during Gemini API calls.
+  - Exposed `POST /api/v1/workspaces/{workspace_id}/queries` in [`backend/app/api/v1/queries.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/api/v1/queries.py) protected by `verify_access_passkey` gatekeeper and in-memory rate limiting.
+  - Added 24 unit and integration tests across:
+    - [`backend/tests/unit/test_citation_validator.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/unit/test_citation_validator.py) (10 tests, including alias collision regression)
+    - [`backend/tests/unit/test_generator.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/unit/test_generator.py) (6 tests)
+    - [`backend/tests/integration/test_rag_pipeline.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/integration/test_rag_pipeline.py) (8 tests, including response citation ID regression)
+  - **Test Metric:** 118/118 passing tests across all backend unit and integration suites (100% pass rate).
+
 ---
 
 ### Verification Metrics & Git History
 
-- **Test Suite Status:** 94 passed, 0 failed, 0 errors (`.venv/bin/pytest -v`).
+- **Test Suite Status:** 118 passed, 0 failed, 0 errors (`.venv/bin/pytest -v`).
 - **Formatting / Code Quality:** 0 lint/whitespace warnings (`git diff --check` clean).
 - **Security Check:** Zero secrets or credentials tracked or staged in git.
 - **Git Commit History:**
@@ -104,4 +120,4 @@ ProofLens AI is an enterprise-grade, evidence-first document intelligence platfo
   - `747e2bc`: `feat: complete Phase 2 database foundation`
   - `312e800`: `feat: complete Phase 3 workspaces and ingestion APIs`
   - `ee57c37`: `feat: implement PDF extraction and page-aware chunking`
-
+  - `308b7f9`: `feat: implement Phase 5 embeddings and vector storage`
