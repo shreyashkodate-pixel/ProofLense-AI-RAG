@@ -150,11 +150,48 @@ ProofLens AI is an enterprise-grade, evidence-first document intelligence platfo
   - **Fix 3 (Safe `not_found` Document Attribution):** In `validator.py`, replaced arbitrary fallback to `documents[0]` with safe unambiguous inference: if exactly one authorized document remains unassigned for the finding, it is attributed to that document; otherwise, ambiguous or unrecognized per-document entries are omitted without fabricating document references.
 - **Test Metric:** 160/160 passing tests across all backend unit and integration suites (100% pass rate in 2.46s).
 
+#### Phase 10: Security Hardening & AI Evaluation Suite (COMPLETED)
+- **Status:** Complete & Fully Verified.
+- **Core Deliverables:**
+  - **Initial 25-Case Curated Benchmark (`curated_benchmark.json`):**
+    - Located in [`backend/tests/eval/curated_benchmark.json`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/eval/curated_benchmark.json).
+    - Exactly 25 curated evaluation queries: 10 Factual Grounded Queries, 5 Cross-Document Comparisons, 10 Negative & Out-of-Scope Queries.
+    - Accompanied by synthetic deterministic corpus fixtures in [`backend/tests/eval/fixtures/synthetic_corpus.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/eval/fixtures/synthetic_corpus.py).
+  - **Evaluation Schemas & Quality Data Models:**
+    - Located in [`backend/app/services/evaluation/schemas.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/evaluation/schemas.py).
+    - Defines `BenchmarkCase`, `CuratedBenchmark` (with composition validation), `StageLatency`, `CaseExecutionResult`, `MetricSummaryItem`, and `OverallEvaluationReport`.
+  - **Metrics Engine & 5-Point Comparison Rubric:**
+    - Located in [`backend/app/services/evaluation/metrics.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/evaluation/metrics.py).
+    - Computes Structural Citation Integrity (100%), Negative Abstention Accuracy (100%), Factual False Abstention Rate (0.0%), Retrieval Recall@5 (100%), Comparison Quality Rubric (100%), Adversarial Prompt Resistance (100%), and Stage-Level P95 Latencies (< 3 ms offline).
+  - **Deterministic Evaluation Harness:**
+    - Located in [`backend/app/services/evaluation/harness.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/evaluation/harness.py).
+    - Executes benchmark cases through actual production `CitationValidator`, `EvidenceSufficiencyEvaluator`, XML entity escaping, and candidate mapping.
+  - **CLI Evaluation Runner:**
+    - Located in [`backend/app/services/evaluation/runner.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/evaluation/runner.py).
+    - Executable via `python -m app.services.evaluation.runner [--offline] [--output eval_report.json] [--hard-gate]`.
+    - Outputs human-readable terminal summary tables and exports machine-readable JSON reports.
+  - **Adversarial Prompt Resistance Test Suite:**
+    - Located in [`backend/tests/eval/test_adversarial_prompts.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/eval/test_adversarial_prompts.py).
+    - Empirically validates defenses against 10 attack vectors: XML delimiter escaping, instruction overrides, secret exfiltration, citation fabrication, unauthorized document spoofing, force-disable abstention, unverified contradiction claims, metadata tampering, markdown links, and DAN jailbreaks.
+  - **Phase 10.1: Live Evaluation Mode Safety Guard (COMPLETED):**
+    - Hardened CLI runner ([`backend/app/services/evaluation/runner.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/evaluation/runner.py)) and execution harness ([`backend/app/services/evaluation/harness.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/evaluation/harness.py)) to explicitly reject `--live` and `offline=False` with `NotImplementedError` and actionable guidance: `"Live evaluation against PostgreSQL/pgvector and Gemini is not yet provisioned; run with --offline."`.
+    - Returns non-zero CLI exit code (2) without generating or printing any reports, guaranteeing that synthetic fixture results are never masqueraded or emitted as live cloud measurements.
+    - Preserves deterministic offline evaluation behavior, hard quality gates, and report formats.
+    - Added comprehensive regression tests in [`backend/tests/eval/test_eval_runner.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/eval/test_eval_runner.py) verifying programmatic and CLI live rejection, actionable error strings, prevention of report emission, offline defaults, and hard-gate failure exit-code handling.
+  - **Unit and Integration Test Suites:**
+    - [`backend/tests/eval/test_benchmark_schema.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/eval/test_benchmark_schema.py) (9 tests)
+    - [`backend/tests/eval/test_eval_metrics.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/eval/test_eval_metrics.py) (5 tests)
+    - [`backend/tests/eval/test_eval_runner.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/eval/test_eval_runner.py) (8 tests)
+    - [`backend/tests/eval/test_adversarial_prompts.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/tests/eval/test_adversarial_prompts.py) (10 tests)
+  - **Operations Documentation:**
+    - [`docs/EVALUATION-GUIDE.md`](file:///Users/apple/Documents/Projects/ProofLense-AI/docs/EVALUATION-GUIDE.md).
+- **Test Metric:** 192/192 passing tests across all backend unit, integration, and evaluation suites (100% pass rate in 11.30s).
+
 ---
 
 ### Verification Metrics & Git History
 
-- **Test Suite Status:** 160 passed, 0 failed, 0 errors (`.venv/bin/pytest -v`).
+- **Test Suite Status:** 192 passed, 0 failed, 0 errors (`.venv/bin/pytest -v`).
 - **Formatting / Code Quality:** 0 lint/whitespace warnings (`git diff --check` clean).
 - **Security Check:** Zero secrets or credentials tracked or staged in git.
 - **Git Commit History:**
@@ -164,5 +201,5 @@ ProofLens AI is an enterprise-grade, evidence-first document intelligence platfo
   - `312e800`: `feat: complete Phase 3 workspaces and ingestion APIs`
   - `ee57c37`: `feat: implement PDF extraction and page-aware chunking`
   - `308b7f9`: `feat: implement Phase 5 embeddings and vector storage`
-  - `e7243c5`: `feat: implement Phase 6 grounded Q&A and citation validation`
-  - `cae1c07`: `fix(rag): resolve Phase 6.1 citation alias collision and response ID mapping`
+  - `3f1766a`: `feat: implement Phase 6 grounded Q&A and Phase 6.1 citation validation audit fixes`
+  - `bafa77a`: `feat: implement Phase 7 cross-document comparison and Phase 7.1 evidence sufficiency fixes`

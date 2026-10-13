@@ -1,0 +1,323 @@
+{
+  "benchmark_version": "1.0.0",
+  "created_at": "2026-10-13T18:45:00Z",
+  "description": "ProofLens AI 25-Case Curated Regression Evaluation Benchmark for Evidence-First RAG and Comparison Pipeline.",
+  "target_corpus": [
+    "alpha_corp_annual_report_2023.pdf",
+    "beta_industries_sustainability_2023.pdf",
+    "gamma_technologies_q4_brief.pdf"
+  ],
+  "cases": [
+    {
+      "case_id": "factual_01",
+      "category": "factual",
+      "question": "What was Alpha Corp's total revenue for FY2023?",
+      "fixture_documents": ["alpha_corp_annual_report_2023.pdf"],
+      "expected_document": "alpha_corp_annual_report_2023.pdf",
+      "expected_page_number": 1,
+      "expected_target_chunk_id": "chunk_alpha_p1_0",
+      "expected_quote": "$125.4 million for FY2023, representing an increase of 14.2% year-over-year.",
+      "expected_answer_contains": ["$125.4 million", "14.2%"],
+      "evaluation_rule": "Answer must cite Alpha Corp page 1 and confirm FY2023 revenue of $125.4 million."
+    },
+    {
+      "case_id": "factual_02",
+      "category": "factual",
+      "question": "How much did Alpha Corp spend on research and development in 2023?",
+      "fixture_documents": ["alpha_corp_annual_report_2023.pdf"],
+      "expected_document": "alpha_corp_annual_report_2023.pdf",
+      "expected_page_number": 2,
+      "expected_target_chunk_id": "chunk_alpha_p2_1",
+      "expected_quote": "Investment in research and development reached $24.8 million, or 19.8% of total revenue.",
+      "expected_answer_contains": ["$24.8 million", "19.8%"],
+      "evaluation_rule": "Answer must cite Alpha Corp page 2 and confirm $24.8 million R&D spending."
+    },
+    {
+      "case_id": "factual_03",
+      "category": "factual",
+      "question": "Where is Alpha Corp's global corporate headquarters located?",
+      "fixture_documents": ["alpha_corp_annual_report_2023.pdf"],
+      "expected_document": "alpha_corp_annual_report_2023.pdf",
+      "expected_page_number": 2,
+      "expected_target_chunk_id": "chunk_alpha_p2_2",
+      "expected_quote": "The global corporate headquarters is situated in Austin, Texas.",
+      "expected_answer_contains": ["Austin, Texas"],
+      "evaluation_rule": "Answer must cite Alpha Corp page 2 and confirm headquarters in Austin, Texas."
+    },
+    {
+      "case_id": "factual_04",
+      "category": "factual",
+      "question": "What were Alpha Corp's Scope 1 and Scope 2 greenhouse gas emissions in 2023?",
+      "fixture_documents": ["alpha_corp_annual_report_2023.pdf"],
+      "expected_document": "alpha_corp_annual_report_2023.pdf",
+      "expected_page_number": 3,
+      "expected_target_chunk_id": "chunk_alpha_p3_0",
+      "expected_quote": "Scope 1 and Scope 2 greenhouse gas emissions totaled 4,200 metric tons of CO2e in 2023.",
+      "expected_answer_contains": ["4,200 metric tons", "CO2e"],
+      "evaluation_rule": "Answer must cite Alpha Corp page 3 and confirm 4,200 metric tons of CO2e."
+    },
+    {
+      "case_id": "factual_05",
+      "category": "factual",
+      "question": "How many full-time employees did Alpha Corp have as of December 31, 2023?",
+      "fixture_documents": ["alpha_corp_annual_report_2023.pdf"],
+      "expected_document": "alpha_corp_annual_report_2023.pdf",
+      "expected_page_number": 2,
+      "expected_target_chunk_id": "chunk_alpha_p2_0",
+      "expected_quote": "Alpha Corp employed 1,420 full-time employees across 8 global offices as of December 31, 2023.",
+      "expected_answer_contains": ["1,420", "8 global offices"],
+      "evaluation_rule": "Answer must cite Alpha Corp page 2 and confirm 1,420 employees."
+    },
+    {
+      "case_id": "factual_06",
+      "category": "factual",
+      "question": "What percentage of electricity across Beta Industries' manufacturing operations came from renewable energy in 2023?",
+      "fixture_documents": ["beta_industries_sustainability_2023.pdf"],
+      "expected_document": "beta_industries_sustainability_2023.pdf",
+      "expected_page_number": 1,
+      "expected_target_chunk_id": "chunk_beta_p1_0",
+      "expected_quote": "Beta Industries powered 92% of manufacturing operations through on-site solar and contracted wind energy in 2023.",
+      "expected_answer_contains": ["92%"],
+      "evaluation_rule": "Answer must cite Beta Industries page 1 and confirm 92% renewable electricity."
+    },
+    {
+      "case_id": "factual_07",
+      "category": "factual",
+      "question": "By what year has Beta Industries formally committed to achieving Net Zero carbon emissions?",
+      "fixture_documents": ["beta_industries_sustainability_2023.pdf"],
+      "expected_document": "beta_industries_sustainability_2023.pdf",
+      "expected_page_number": 2,
+      "expected_target_chunk_id": "chunk_beta_p2_2",
+      "expected_quote": "Beta Industries formally committed to achieving Net Zero carbon emissions by 2040.",
+      "expected_answer_contains": ["2040"],
+      "evaluation_rule": "Answer must cite Beta Industries page 2 and confirm Net Zero by 2040."
+    },
+    {
+      "case_id": "factual_08",
+      "category": "factual",
+      "question": "What was Beta Industries' safety record in terms of Lost Time Injury Frequency Rate (LTIFR) in 2023?",
+      "fixture_documents": ["beta_industries_sustainability_2023.pdf"],
+      "expected_document": "beta_industries_sustainability_2023.pdf",
+      "expected_page_number": 3,
+      "expected_target_chunk_id": "chunk_beta_p3_1",
+      "expected_quote": "Lost Time Injury Frequency Rate (LTIFR) was recorded at 0.42 per million hours worked.",
+      "expected_answer_contains": ["0.42"],
+      "evaluation_rule": "Answer must cite Beta Industries page 3 and confirm 0.42 LTIFR."
+    },
+    {
+      "case_id": "factual_09",
+      "category": "factual",
+      "question": "What was Gamma Technologies' consolidated revenue for FY2023?",
+      "fixture_documents": ["gamma_technologies_q4_brief.pdf"],
+      "expected_document": "gamma_technologies_q4_brief.pdf",
+      "expected_page_number": 1,
+      "expected_target_chunk_id": "chunk_gamma_p1_0",
+      "expected_quote": "Gamma Technologies achieved FY2023 consolidated revenue of $125.4 million, matching market consensus.",
+      "expected_answer_contains": ["$125.4 million"],
+      "evaluation_rule": "Answer must cite Gamma Technologies page 1 and confirm $125.4 million revenue."
+    },
+    {
+      "case_id": "factual_10",
+      "category": "factual",
+      "question": "What is Gamma Technologies' target year for achieving Net Zero carbon emissions?",
+      "fixture_documents": ["gamma_technologies_q4_brief.pdf"],
+      "expected_document": "gamma_technologies_q4_brief.pdf",
+      "expected_page_number": 2,
+      "expected_target_chunk_id": "chunk_gamma_p2_0",
+      "expected_quote": "Gamma Technologies adopted an accelerated climate roadmap targeting Net Zero carbon emissions by 2030.",
+      "expected_answer_contains": ["2030"],
+      "evaluation_rule": "Answer must cite Gamma Technologies page 2 and confirm Net Zero by 2030."
+    },
+    {
+      "case_id": "comparison_01",
+      "category": "comparison",
+      "question": "Compare the total FY2023 consolidated revenue of Alpha Corp and Gamma Technologies.",
+      "fixture_documents": [
+        "alpha_corp_annual_report_2023.pdf",
+        "gamma_technologies_q4_brief.pdf"
+      ],
+      "expected_relationship": "agreement",
+      "expected_per_document_evidence": {
+        "alpha_corp_annual_report_2023.pdf": {
+          "expected_quote": "$125.4 million for FY2023, representing an increase of 14.2% year-over-year.",
+          "page_number": 1
+        },
+        "gamma_technologies_q4_brief.pdf": {
+          "expected_quote": "Gamma Technologies achieved FY2023 consolidated revenue of $125.4 million, matching market consensus.",
+          "page_number": 1
+        }
+      },
+      "expected_limitations": "Alpha Corp noted a 14.2% YoY increase, while Gamma Technologies noted meeting market consensus without detailing historical growth rates.",
+      "evaluation_rule": "Comparison must classify revenue relationship as agreement ($125.4M each) with citations from both documents."
+    },
+    {
+      "case_id": "comparison_02",
+      "category": "comparison",
+      "question": "How do the net profitability figures of Alpha Corp and Gamma Technologies compare for FY2023?",
+      "fixture_documents": [
+        "alpha_corp_annual_report_2023.pdf",
+        "gamma_technologies_q4_brief.pdf"
+      ],
+      "expected_relationship": "contradiction",
+      "expected_per_document_evidence": {
+        "alpha_corp_annual_report_2023.pdf": {
+          "expected_quote": "$18.6 million in FY2023 compared to $14.1 million in FY2022.",
+          "page_number": 1
+        },
+        "gamma_technologies_q4_brief.pdf": {
+          "expected_quote": "Net loss for FY2023 was $(4.2) million due to restructuring charges.",
+          "page_number": 1
+        }
+      },
+      "expected_limitations": "Gamma Technologies suffered losses from one-off restructuring charges, whereas Alpha Corp expanded software licensing margins.",
+      "evaluation_rule": "Comparison must identify contradiction/divergence between Alpha Corp profit ($18.6M) and Gamma Technologies loss ($(4.2)M)."
+    },
+    {
+      "case_id": "comparison_03",
+      "category": "comparison",
+      "question": "Compare the target years for achieving Net Zero carbon emissions between Beta Industries and Gamma Technologies.",
+      "fixture_documents": [
+        "beta_industries_sustainability_2023.pdf",
+        "gamma_technologies_q4_brief.pdf"
+      ],
+      "expected_relationship": "difference",
+      "expected_per_document_evidence": {
+        "beta_industries_sustainability_2023.pdf": {
+          "expected_quote": "Beta Industries formally committed to achieving Net Zero carbon emissions by 2040.",
+          "page_number": 2
+        },
+        "gamma_technologies_q4_brief.pdf": {
+          "expected_quote": "Gamma Technologies adopted an accelerated climate roadmap targeting Net Zero carbon emissions by 2030.",
+          "page_number": 2
+        }
+      },
+      "expected_limitations": "Beta Industries targets 2040 for heavy industrial manufacturing, whereas Gamma Technologies targets an accelerated 2030 timeline for enterprise technology services.",
+      "evaluation_rule": "Comparison must classify difference in net zero targets (Beta: 2040 vs Gamma: 2030) with citations from both sources."
+    },
+    {
+      "case_id": "comparison_04",
+      "category": "comparison",
+      "question": "Compare Scope 1 and Scope 2 greenhouse gas emissions reported by Alpha Corp and Beta Industries in 2023.",
+      "fixture_documents": [
+        "alpha_corp_annual_report_2023.pdf",
+        "beta_industries_sustainability_2023.pdf"
+      ],
+      "expected_relationship": "agreement",
+      "expected_per_document_evidence": {
+        "alpha_corp_annual_report_2023.pdf": {
+          "expected_quote": "Scope 1 and Scope 2 greenhouse gas emissions totaled 4,200 metric tons of CO2e in 2023.",
+          "page_number": 3
+        },
+        "beta_industries_sustainability_2023.pdf": {
+          "expected_quote": "Beta Industries emitted 4,200 metric tons of CO2e across Scope 1 and Scope 2 operations in 2023",
+          "page_number": 2
+        }
+      },
+      "expected_limitations": "While the numerical total is identical (4,200 MT CO2e), Alpha Corp covers office facilities and data centers whereas Beta Industries covers industrial manufacturing.",
+      "evaluation_rule": "Comparison must classify emissions agreement (4,200 MT CO2e each) while noting differences in operational scope."
+    },
+    {
+      "case_id": "comparison_05",
+      "category": "comparison",
+      "question": "Compare the employee patent incentive programs and intellectual property bonus structures described by Alpha Corp and Beta Industries.",
+      "fixture_documents": [
+        "alpha_corp_annual_report_2023.pdf",
+        "beta_industries_sustainability_2023.pdf"
+      ],
+      "expected_relationship": "not_found",
+      "expected_per_document_evidence": {},
+      "expected_limitations": "Neither document mentions patent bonus policies or intellectual property incentives.",
+      "evaluation_rule": "Comparison must explicitly state not_found / insufficient evidence with zero fabricated citations."
+    },
+    {
+      "case_id": "negative_01",
+      "category": "negative",
+      "question": "What type of solid rocket propellant does Alpha Corp utilize in its commercial orbital launch vehicles?",
+      "fixture_documents": ["alpha_corp_annual_report_2023.pdf"],
+      "expected_abstention": true,
+      "abstention_reason": "Topic (aerospace/rocketry) is completely out of scope; Alpha Corp is a software and technology enterprise.",
+      "evaluation_rule": "System must return is_abstention=true with canonical insufficient evidence messaging."
+    },
+    {
+      "case_id": "negative_02",
+      "category": "negative",
+      "question": "What was Beta Industries' gross profit in Japanese Yen during the fiscal year 1995?",
+      "fixture_documents": ["beta_industries_sustainability_2023.pdf"],
+      "expected_abstention": true,
+      "abstention_reason": "Temporal (1995) and financial domain out of scope; document is a 2023 sustainability report.",
+      "evaluation_rule": "System must return is_abstention=true with zero hallucinated figures."
+    },
+    {
+      "case_id": "negative_03",
+      "category": "negative",
+      "question": "Which cardiovascular medications were approved in Phase III clinical trials by Gamma Technologies in 2023?",
+      "fixture_documents": ["gamma_technologies_q4_brief.pdf"],
+      "expected_abstention": true,
+      "abstention_reason": "Pharmaceutical clinical trials are out of scope; Gamma Technologies is a software enterprise.",
+      "evaluation_rule": "System must return is_abstention=true."
+    },
+    {
+      "case_id": "negative_04",
+      "category": "negative",
+      "question": "What was Alpha Corp's total consolidated revenue in fiscal year 2020?",
+      "fixture_documents": ["alpha_corp_annual_report_2023.pdf"],
+      "expected_abstention": true,
+      "abstention_reason": "Superficially related to revenue, but the report only provides FY2023 and FY2022 figures; FY2020 is absent.",
+      "evaluation_rule": "System must recognize lack of FY2020 data and abstain rather than extrapolating."
+    },
+    {
+      "case_id": "negative_05",
+      "category": "negative",
+      "question": "How many electric delivery vans were deployed by Beta Industries across its distribution network in Latin America?",
+      "fixture_documents": ["beta_industries_sustainability_2023.pdf"],
+      "expected_abstention": true,
+      "abstention_reason": "Superficially related to sustainability, but the report documents only European and North American facilities; Latin America van counts are absent.",
+      "evaluation_rule": "System must return is_abstention=true without fabricating fleet metrics."
+    },
+    {
+      "case_id": "negative_06",
+      "category": "negative",
+      "question": "What is the secret recipe and spice ratio for Alpha Corp's corporate cafeteria barbecue sauce?",
+      "fixture_documents": ["alpha_corp_annual_report_2023.pdf"],
+      "expected_abstention": true,
+      "abstention_reason": "Completely frivolous and ungrounded topic absent from corporate filing.",
+      "evaluation_rule": "System must return is_abstention=true."
+    },
+    {
+      "case_id": "negative_07",
+      "category": "negative",
+      "question": "What is Gamma Technologies' projected consolidated revenue for the fiscal year 2035?",
+      "fixture_documents": ["gamma_technologies_q4_brief.pdf"],
+      "expected_abstention": true,
+      "abstention_reason": "Forward-looking forecast 12 years into the future is absent from Q4 brief.",
+      "evaluation_rule": "System must return is_abstention=true."
+    },
+    {
+      "case_id": "negative_08",
+      "category": "negative",
+      "question": "What percentage of Beta Industries' executive board members are certified deep-sea scuba divers?",
+      "fixture_documents": ["beta_industries_sustainability_2023.pdf"],
+      "expected_abstention": true,
+      "abstention_reason": "Superficially mentions board size (9 directors), but recreational hobbies/diving certifications are completely absent.",
+      "evaluation_rule": "System must abstain rather than guessing board member qualifications."
+    },
+    {
+      "case_id": "negative_09",
+      "category": "negative",
+      "question": "What was Alpha Corp's corporate income tax liability paid directly to the government of Australia in 2023?",
+      "fixture_documents": ["alpha_corp_annual_report_2023.pdf"],
+      "expected_abstention": true,
+      "abstention_reason": "Mentions global offices, but jurisdictional breakdown for Australia is absent.",
+      "evaluation_rule": "System must return is_abstention=true."
+    },
+    {
+      "case_id": "negative_10",
+      "category": "negative",
+      "question": "How many liters of espresso were consumed by Gamma Technologies software engineers in Q4 2023?",
+      "fixture_documents": ["gamma_technologies_q4_brief.pdf"],
+      "expected_abstention": true,
+      "abstention_reason": "Internal beverage consumption statistics are completely absent from financial filing.",
+      "evaluation_rule": "System must return is_abstention=true."
+    }
+  ]
+}
