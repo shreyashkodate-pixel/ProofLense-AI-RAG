@@ -11,7 +11,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.v1.documents import router as documents_router
 from app.api.v1.health import router as health_router
+from app.api.v1.workspaces import router as workspaces_router
 from app.core.config import Settings, get_settings
 from app.core.database import close_engine, get_engine
 from app.core.errors import (
@@ -79,8 +81,10 @@ def create_application() -> FastAPI:
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, generic_exception_handler)
 
-    # 4. Mount Health Router (/health/live, /health/ready)
+    # 4. Mount API Routers
     app.include_router(health_router)
+    app.include_router(workspaces_router, prefix="/api/v1")
+    app.include_router(documents_router, prefix="/api/v1")
 
     # 5. Foundation Endpoints (Phase 1 Baseline)
     @app.get("/", tags=["Root"])
