@@ -11,11 +11,17 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.v1.health import router as health_router
 from app.core.config import Settings, get_settings
+from app.core.database import close_engine, get_engine
 from app.core.errors import (
     generic_exception_handler,
     http_exception_handler,
     validation_exception_handler,
+)
+from app.core.lifespan import (
+    recover_stale_ingestion_jobs,
+    verify_vector_dimension_compatibility,
 )
 from app.core.logging import logger, setup_logging
 from app.core.rate_limit import RateLimitMiddleware
@@ -38,7 +44,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
 
-    # Shutdown logic
+    # Shutdown logic: Close database connection pool
+    await close_engine()
     logger.info("ProofLens AI backend shutting down.")
 
 
@@ -72,7 +79,10 @@ def create_application() -> FastAPI:
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, generic_exception_handler)
 
-    # 4. Foundation Endpoints (Phase 1)
+    # 4. Mount Health Router (/health/live, /health/ready)
+    app.include_router(health_router)
+
+    # 5. Foundation Endpoints (Phase 1 Baseline)
     @app.get("/", tags=["Root"])
     async def root():
         """Root endpoint returning basic service metadata."""
@@ -82,11 +92,6 @@ def create_application() -> FastAPI:
             "environment": settings.ENVIRONMENT,
             "status": "online",
         }
-
-    @app.get("/health/live", tags=["Health"], status_code=status.HTTP_200_OK)
-    async def liveness_probe():
-        """Unauthenticated process liveness probe for container orchestrators."""
-        return {"status": "alive"}
 
     @app.get("/api/v1/auth-test", tags=["Security"], dependencies=[Depends(verify_access_passkey)])
     async def auth_test_endpoint():
