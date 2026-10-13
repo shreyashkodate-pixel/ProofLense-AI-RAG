@@ -50,7 +50,7 @@ def test_production_fails_without_demo_access_token():
             DEMO_ACCESS_TOKEN="",
             DATABASE_URL="postgresql+asyncpg://user:pass@host:5432/db",
             DATABASE_SSL_REQUIRED=True,
-            GEMINI_API_KEY="AIzaSyDummyProductionApiKeyLong123",
+            GEMINI_API_KEY="dummy-production-gemini-api-key-test",
         )
     assert "DEMO_ACCESS_TOKEN is required" in str(exc_info.value)
 
@@ -61,7 +61,7 @@ def test_production_fails_without_demo_access_token():
             DEMO_ACCESS_TOKEN="short-token-123",
             DATABASE_URL="postgresql+asyncpg://user:pass@host:5432/db",
             DATABASE_SSL_REQUIRED=True,
-            GEMINI_API_KEY="AIzaSyDummyProductionApiKeyLong123",
+            GEMINI_API_KEY="dummy-production-gemini-api-key-test",
         )
     assert "at least 16 characters long" in str(exc_info.value)
 
@@ -75,7 +75,7 @@ def test_production_fails_if_auth_disabled():
             AUTH_ENABLED=False,
             DATABASE_URL="postgresql+asyncpg://user:pass@host:5432/db",
             DATABASE_SSL_REQUIRED=True,
-            GEMINI_API_KEY="AIzaSyDummyProductionApiKeyLong123",
+            GEMINI_API_KEY="dummy-production-gemini-api-key-test",
         )
     assert "AUTH_ENABLED=false is strictly prohibited in production" in str(exc_info.value)
 
@@ -89,7 +89,7 @@ def test_production_fails_without_database_ssl():
             AUTH_ENABLED=True,
             DATABASE_URL="postgresql+asyncpg://user:pass@host:5432/db",
             DATABASE_SSL_REQUIRED=False,
-            GEMINI_API_KEY="AIzaSyDummyProductionApiKeyLong123",
+            GEMINI_API_KEY="dummy-production-gemini-api-key-test",
         )
     assert "DATABASE_SSL_REQUIRED must be set to true in production" in str(exc_info.value)
 
@@ -117,7 +117,7 @@ def test_valid_production_configuration():
         AUTH_ENABLED=True,
         DATABASE_URL="postgresql+asyncpg://user:pass@host:5432/db",
         DATABASE_SSL_REQUIRED=True,
-        GEMINI_API_KEY="AIzaSyDummyProductionApiKeyLong123",
+        GEMINI_API_KEY="dummy-production-gemini-api-key-test",
     )
     assert settings.ENVIRONMENT == "production"
     assert settings.DEBUG is False

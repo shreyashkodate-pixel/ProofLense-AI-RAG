@@ -4,6 +4,7 @@ Data access functions for documents enforcing strict workspace scoping,
 atomic worker claims, duplicate hash detection, and safe row locking.
 """
 
+import inspect
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
@@ -152,6 +153,7 @@ async def persist_extracted_pages_and_chunks(
     document_id: uuid.UUID,
     pages: List[ParsedPage],
     chunks: List[ChunkData],
+    mark_ready: bool = False,
 ) -> Tuple[List[DocumentPage], List[DocumentChunk]]:
     """Persist extracted physical pages and bounded chunks in a single transaction.
 
@@ -183,7 +185,7 @@ async def persist_extracted_pages_and_chunks(
         session.add(page_record)
         created_pages.append(page_record)
 
-    # 3. Persist DocumentChunk records
+    # 3. Persist DocumentChunk records (embedding is initially None pending Phase 5)
     created_chunks: List[DocumentChunk] = []
     for chunk_data in chunks:
         page_id = page_id_map.get(chunk_data.page_number)
@@ -195,25 +197,114 @@ async def persist_extracted_pages_and_chunks(
             page_id=page_id,
             chunk_index=chunk_data.chunk_index,
             chunk_text=chunk_data.chunk_text,
+            embedding=None,
             embedding_model="gemini-embedding-2",
             token_count=chunk_data.token_count,
         )
         session.add(chunk_record)
         created_chunks.append(chunk_record)
 
-    # 4. Update Document status to 'ready' and record page_count
+    # 4. Update Document page_count (and status if explicitly requested)
+    update_values: dict = {
+        "page_count": len(pages),
+        "error_message": None,
+    }
+    if mark_ready:
+        update_values["status"] = "ready"
+
     await session.execute(
         update(Document)
         .where(Document.id == document_id)
-        .values(
-            status="ready",
-            page_count=len(pages),
-            error_message=None,
-        )
+        .values(**update_values)
     )
 
     await session.commit()
     return created_pages, created_chunks
+
+
+async def _extract_scalars_list(result) -> list:
+    """Safely extract scalar results from SQLAlchemy Result, handling mock coroutines gracefully."""
+    if not hasattr(result, "scalars"):
+        return []
+    scalars_res = result.scalars()
+    if inspect.iscoroutine(scalars_res):
+        scalars_res = await scalars_res
+    if not hasattr(scalars_res, "all"):
+        return []
+    items = scalars_res.all()
+    if inspect.iscoroutine(items):
+        items = await items
+    return list(items)
+
+
+async def get_unembedded_chunks(
+    session: AsyncSession,
+    document_id: uuid.UUID,
+) -> List[DocumentChunk]:
+    """Retrieve all chunks for a document that are missing embeddings.
+
+    Orders results strictly by chunk_index ascending to preserve document sequence.
+    """
+    stmt = (
+        select(DocumentChunk)
+        .where(
+            DocumentChunk.document_id == document_id,
+            DocumentChunk.embedding.is_(None),
+        )
+        .order_by(DocumentChunk.chunk_index.asc())
+    )
+    result = await session.execute(stmt)
+    return await _extract_scalars_list(result)
+
+
+
+async def update_chunk_embeddings(
+    session: AsyncSession,
+    chunk_embeddings: List[Tuple[uuid.UUID, List[float], str]],
+) -> int:
+    """Persist validated vector embeddings to document chunks.
+
+    Args:
+        session: Async database session.
+        chunk_embeddings: List of tuples (chunk_id, embedding_vector, model_name).
+
+    Returns:
+        Number of updated chunk records.
+    """
+    if not chunk_embeddings:
+        return 0
+
+    for chunk_id, embedding_vector, model_name in chunk_embeddings:
+        await session.execute(
+            update(DocumentChunk)
+            .where(DocumentChunk.id == chunk_id)
+            .values(
+                embedding=embedding_vector,
+                embedding_model=model_name,
+            )
+        )
+    await session.commit()
+    return len(chunk_embeddings)
+
+
+async def mark_document_ready(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    doc_id: uuid.UUID,
+) -> None:
+    """Transition a document to 'ready' status once embeddings are fully persisted."""
+    await session.execute(
+        update(Document)
+        .where(
+            Document.id == doc_id,
+            Document.workspace_id == workspace_id,
+        )
+        .values(
+            status="ready",
+            error_message=None,
+        )
+    )
+    await session.commit()
 
 
 async def mark_document_failed(
@@ -237,6 +328,7 @@ async def mark_document_failed(
     await session.commit()
 
 
+
 async def get_document_pages(
     session: AsyncSession,
     document_id: uuid.UUID,
@@ -248,7 +340,7 @@ async def get_document_pages(
         .order_by(DocumentPage.page_number.asc())
     )
     result = await session.execute(stmt)
-    return list(result.scalars().all())
+    return await _extract_scalars_list(result)
 
 
 async def get_document_chunks(
@@ -262,4 +354,4 @@ async def get_document_chunks(
         .order_by(DocumentChunk.chunk_index.asc())
     )
     result = await session.execute(stmt)
-    return list(result.scalars().all())
+    return await _extract_scalars_list(result)

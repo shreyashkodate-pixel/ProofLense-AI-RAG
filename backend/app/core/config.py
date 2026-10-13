@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     GEMINI_GENERATION_MODEL: str = "gemini-3.8-flash"
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
     EMBEDDING_DIMENSIONS: int = 768
+    GEMINI_EMBEDDING_BATCH_SIZE: int = 50
     GEMINI_REQUEST_TIMEOUT_SECONDS: int = 30
     GEMINI_MAX_RETRIES: int = 3
 

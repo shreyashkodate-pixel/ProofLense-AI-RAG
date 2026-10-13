@@ -17,6 +17,7 @@ from app.core.config import Settings, get_settings
 from app.core.database import get_session_factory
 from app.core.logging import logger
 from app.repositories import document_repo
+from app.services.ai.embedding import GeminiEmbeddingService, get_embedding_service
 from app.services.parsing.chunker import chunk_document_pages
 from app.services.parsing.pdf_parser import PDFParsingError, extract_pdf_pages
 from app.services.storage.base import BaseStorageService
@@ -29,6 +30,7 @@ async def run_ingestion_pipeline(
     session: Optional[AsyncSession] = None,
     storage: Optional[BaseStorageService] = None,
     settings: Optional[Settings] = None,
+    embedding_service: Optional[GeminiEmbeddingService] = None,
 ) -> bool:
     """Execute complete ingestion pipeline for a single document.
 
@@ -38,12 +40,14 @@ async def run_ingestion_pipeline(
         session: Optional existing AsyncSession (acquired from factory if None).
         storage: Optional BaseStorageService (acquired from factory if None).
         settings: Optional Settings (acquired from get_settings if None).
+        embedding_service: Optional GeminiEmbeddingService (acquired via factory if None).
 
     Returns:
         True if ingestion succeeded and document is 'ready', False if failed.
     """
     settings = settings or get_settings()
     storage = storage or get_storage_service()
+    embedding_service = embedding_service or get_embedding_service(settings=settings)
 
     if session is None:
         session_factory = get_session_factory()
@@ -54,6 +58,7 @@ async def run_ingestion_pipeline(
                 session=owned_session,
                 storage=storage,
                 settings=settings,
+                embedding_service=embedding_service,
             )
     else:
         return await _execute_pipeline_core(
@@ -62,6 +67,7 @@ async def run_ingestion_pipeline(
             session=session,
             storage=storage,
             settings=settings,
+            embedding_service=embedding_service,
         )
 
 
@@ -71,6 +77,7 @@ async def _execute_pipeline_core(
     session: AsyncSession,
     storage: BaseStorageService,
     settings: Settings,
+    embedding_service: GeminiEmbeddingService,
 ) -> bool:
     """Internal implementation executing ingestion pipeline steps with provided session."""
     # 1. Fetch document and verify scope
@@ -97,66 +104,123 @@ async def _execute_pipeline_core(
         )
         return False
 
-    # 3. Retrieve physical file from storage
-    storage_path = doc.storage_path
-    try:
-        file_bytes = await storage.get_file(storage_path)
-    except Exception as exc:
-        err_msg = f"Storage retrieval error: {str(exc)}"
-        logger.error(f"Failed to read file from storage for document {document_id}: {err_msg}")
-        await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
-        return False
+    # 3. Check if document already has chunks persisted (e.g. from retry after embedding failure)
+    existing_chunks = await document_repo.get_document_chunks(session, document_id)
+    chunks_to_embed = []
 
-    if file_bytes is None:
-        err_msg = f"Physical file not found in storage: {storage_path}"
-        logger.warning(f"File missing in storage for document {document_id}: {err_msg}")
-        await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
-        return False
+    if not existing_chunks:
+        # Retrieve physical file from storage
+        storage_path = doc.storage_path
+        try:
+            file_bytes = await storage.get_file(storage_path)
+        except Exception as exc:
+            err_msg = f"Storage retrieval error: {str(exc)}"
+            logger.error(f"Failed to read file from storage for document {document_id}: {err_msg}")
+            await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
+            return False
 
-    # 4. Parse PDF into pages
-    try:
-        parsed_pdf = extract_pdf_pages(file_bytes)
-    except PDFParsingError as exc:
-        err_msg = str(exc)
-        logger.warning(f"Extraction failed for document {document_id}: {err_msg}")
-        await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
-        return False
-    except Exception as exc:
-        err_msg = f"Unexpected PDF parsing error: {str(exc)}"
-        logger.error(f"Extraction error for document {document_id}: {err_msg}")
-        await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
-        return False
+        if file_bytes is None:
+            err_msg = f"Physical file not found in storage: {storage_path}"
+            logger.warning(f"File missing in storage for document {document_id}: {err_msg}")
+            await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
+            return False
 
-    # 5. Chunk extracted pages
-    try:
-        chunks = chunk_document_pages(
-            pages=parsed_pdf.pages,
-            chunk_size=settings.RAG_CHUNK_SIZE,
-            chunk_overlap=settings.RAG_CHUNK_OVERLAP,
-        )
-    except Exception as exc:
-        err_msg = f"Chunking error: {str(exc)}"
-        logger.error(f"Chunking error for document {document_id}: {err_msg}")
-        await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
-        return False
+        # Parse PDF into pages
+        try:
+            parsed_pdf = extract_pdf_pages(file_bytes)
+        except PDFParsingError as exc:
+            err_msg = str(exc)
+            logger.warning(f"Extraction failed for document {document_id}: {err_msg}")
+            await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
+            return False
+        except Exception as exc:
+            err_msg = f"Unexpected PDF parsing error: {str(exc)}"
+            logger.error(f"Extraction error for document {document_id}: {err_msg}")
+            await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
+            return False
 
-    # 6. Persist pages, chunks, and transition document to 'ready'
-    try:
-        await document_repo.persist_extracted_pages_and_chunks(
-            session=session,
-            document_id=document_id,
-            pages=parsed_pdf.pages,
-            chunks=chunks,
-        )
+        # Chunk extracted pages
+        try:
+            chunks = chunk_document_pages(
+                pages=parsed_pdf.pages,
+                chunk_size=settings.RAG_CHUNK_SIZE,
+                chunk_overlap=settings.RAG_CHUNK_OVERLAP,
+            )
+        except Exception as exc:
+            err_msg = f"Chunking error: {str(exc)}"
+            logger.error(f"Chunking error for document {document_id}: {err_msg}")
+            await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
+            return False
+
+        # Persist pages and bounded chunks (keep in 'processing' status pending embeddings)
+        try:
+            persist_res = await document_repo.persist_extracted_pages_and_chunks(
+                session=session,
+                document_id=document_id,
+                pages=parsed_pdf.pages,
+                chunks=chunks,
+                mark_ready=False,
+            )
+            logger.info(
+                f"Document {document_id} ('{doc.filename}') chunks persisted: "
+                f"{parsed_pdf.total_pages} pages, {len(chunks)} chunks."
+            )
+        except Exception as exc:
+            await session.rollback()
+            err_msg = f"Database persistence error: {str(exc)}"
+            logger.error(f"Persistence error for document {document_id}: {err_msg}")
+            await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
+            return False
+
+        if isinstance(persist_res, (list, tuple)) and len(persist_res) == 2:
+            _, raw_chunks = persist_res
+            if isinstance(raw_chunks, list):
+                chunks_to_embed = raw_chunks
+    else:
+        # Document was already parsed and chunked; only embed missing chunks
         logger.info(
-            f"Document {document_id} ('{doc.filename}') ingested successfully: "
-            f"{parsed_pdf.total_pages} pages, {len(chunks)} chunks persisted."
+            f"Document {document_id} already has {len(existing_chunks)} persisted chunks. Resuming embedding."
         )
+        unembedded = await document_repo.get_unembedded_chunks(session, document_id)
+        chunks_to_embed = unembedded
+
+
+    if chunks_to_embed:
+        chunk_texts = [c.chunk_text for c in chunks_to_embed if hasattr(c, "chunk_text")]
+        if chunk_texts:
+            try:
+                embeddings = await embedding_service.embed_texts(chunk_texts)
+            except Exception as exc:
+                err_msg = f"Embedding generation failed: {str(exc)}"
+                logger.error(f"Embedding error for document {document_id}: {err_msg}")
+                await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
+                return False
+
+            chunk_embeddings = [
+                (c.id, vector, settings.GEMINI_EMBEDDING_MODEL)
+                for c, vector in zip(chunks_to_embed, embeddings)
+            ]
+            try:
+                await document_repo.update_chunk_embeddings(session, chunk_embeddings)
+                logger.info(
+                    f"Persisted {len(chunk_embeddings)} embeddings for document {document_id}."
+                )
+            except Exception as exc:
+                await session.rollback()
+                err_msg = f"Vector persistence error: {str(exc)}"
+                logger.error(f"Vector persistence error for document {document_id}: {err_msg}")
+                await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
+                return False
+
+    # 8. Atomically transition document to 'ready' once all chunks are embedded
+    try:
+        await document_repo.mark_document_ready(session, workspace_id, document_id)
+        logger.info(f"Document {document_id} ('{doc.filename}') successfully transitioned to 'ready'.")
         return True
     except Exception as exc:
         await session.rollback()
-        err_msg = f"Database persistence error: {str(exc)}"
-        logger.error(f"Persistence error for document {document_id}: {err_msg}")
+        err_msg = f"Status transition error: {str(exc)}"
+        logger.error(f"Ready status transition failed for document {document_id}: {err_msg}")
         await document_repo.mark_document_failed(session, workspace_id, document_id, err_msg)
         return False
 

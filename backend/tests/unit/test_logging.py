@@ -11,9 +11,9 @@ from app.core.logging import JSONLogFormatter, redact_sensitive_text
 
 def test_redact_sensitive_text_api_key():
     """Verify Gemini API keys are redacted."""
-    raw = "Calling Gemini API with key AIzaSyDUMMYKEY1234567890abcdefghijklm"
+    raw = "Calling Gemini API with key AIza_MOCK_SECRET_REDACTION_KEY_12345"
     sanitized = redact_sensitive_text(raw)
-    assert "AIzaSy" not in sanitized
+    assert "AIza_MOCK_SECRET_REDACTION_KEY_12345" not in sanitized
     assert "[REDACTED_API_KEY]" in sanitized
 
 
@@ -41,7 +41,7 @@ def test_json_log_formatter_output():
         level=logging.INFO,
         pathname="test.py",
         lineno=10,
-        msg="Service started on port 8000 with key AIzaSyABCDEF1234567890abcdefghijklmn",
+        msg="Service started on port 8000 with key AIza_MOCK_LOG_FORMATTER_KEY_67890",
         args=(),
         exc_info=None,
     )
@@ -51,5 +51,5 @@ def test_json_log_formatter_output():
     assert parsed["level"] == "INFO"
     assert parsed["logger"] == "prooflens.test"
     assert "[REDACTED_API_KEY]" in parsed["message"]
-    assert "AIzaSy" not in parsed["message"]
+    assert "AIza_MOCK_LOG_FORMATTER_KEY_67890" not in parsed["message"]
     assert "timestamp" in parsed
