@@ -6,8 +6,13 @@
 import { getStoredPasskey } from "@/lib/auth/passkey";
 import { ProblemDetails } from "./types";
 
-export const API_BASE_URL =
+const rawBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:8000";
+
+// Strip trailing /api/v1 if present, since API service endpoints include /api/v1
+export const API_BASE_URL = rawBaseUrl.endsWith("/api/v1")
+  ? rawBaseUrl.slice(0, -"/api/v1".length)
+  : rawBaseUrl;
 
 export async function apiFetch<T>(
   endpoint: string,
