@@ -1,0 +1,82 @@
+.sidebar {
+  width: 240px;
+  background-color: var(--color-surface);
+  border-right: var(--border-width-thin) solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-4) 0;
+  height: calc(100vh - 56px);
+  position: sticky;
+  top: 56px;
+  flex-shrink: 0;
+}
+
+.navGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0 var(--space-3);
+}
+
+.groupLabel {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.05em;
+  padding: var(--space-2) var(--space-3);
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  text-decoration: none;
+  transition: all var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.navLink:hover {
+  background-color: var(--color-surface-alt);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+.navLinkActive {
+  background-color: var(--color-surface-muted);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.navLinkDisabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.linkLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.phaseBadge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-surface-alt);
+  color: var(--color-text-tertiary);
+  border: var(--border-width-thin) solid var(--color-border);
+}
+
+.footer {
+  padding: 0 var(--space-3);
+  border-top: var(--border-width-thin) solid var(--color-border);
+  padding-top: var(--space-3);
+}

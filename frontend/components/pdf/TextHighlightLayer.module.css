@@ -1,0 +1,85 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-surface);
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-3);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.statusExact {
+  background-color: var(--color-status-success-bg);
+  color: var(--color-status-success-text);
+  border: var(--border-width-thin) solid var(--color-status-success-border);
+}
+
+.statusApproximate {
+  background-color: var(--color-status-warning-bg);
+  color: var(--color-status-warning-text);
+  border: var(--border-width-thin) solid var(--color-status-warning-border);
+}
+
+.statusUnmatched {
+  background-color: var(--color-surface-alt);
+  color: var(--color-text-secondary);
+  border: var(--border-width-thin) solid var(--color-border);
+}
+
+.clearBtn {
+  background: none;
+  border: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.clearBtn:hover {
+  color: var(--color-text-primary);
+}
+
+.snippetBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-canvas);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+}
+
+.snippetLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.snippetText {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-primary);
+  font-style: italic;
+}

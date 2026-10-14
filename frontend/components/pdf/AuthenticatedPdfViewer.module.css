@@ -1,0 +1,68 @@
+.viewerContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background-color: var(--color-surface-alt);
+  overflow: hidden;
+  position: relative;
+}
+
+.topBar {
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-surface);
+  border-bottom: var(--border-width-thin) solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.canvasScrollArea {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-6);
+  background-color: var(--color-canvas);
+}
+
+.canvasWrapper {
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-sm);
+  background-color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.pdfCanvas {
+  display: block;
+}
+
+.loadingOverlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-12);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.errorOverlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-12);
+  text-align: center;
+  color: var(--color-status-danger-text);
+  max-width: 440px;
+  margin: var(--space-8) auto;
+  background-color: var(--color-surface);
+  border: var(--border-width-thin) solid var(--color-status-danger-border);
+  border-radius: var(--radius-lg);
+}
