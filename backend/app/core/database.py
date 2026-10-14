@@ -24,9 +24,12 @@ def normalize_database_url(url: str) -> str:
     if not url:
         return url
     if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+asyncpg://", 1)
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    # asyncpg expects 'ssl' parameter instead of psycopg2's 'sslmode'
+    if "sslmode=" in url:
+        url = url.replace("sslmode=", "ssl=")
     return url
 
 
