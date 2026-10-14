@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "lucide-react": "^1.57.0",
-    "next": "^15.2.1",
+    "next": "^15.5.27",
     "pdfjs-dist": "^4.10.38",
     "react": "19.3.0",
     "react-dom": "19.3.0"
@@ -26,7 +26,7 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.1.2",
     "eslint": "^9",
-    "eslint-config-next": "^15.2.1",
+    "eslint-config-next": "^15.5.27",
     "jsdom": "^30.1.2",
     "typescript": "^5",
     "vitest": "^5.0.4"
