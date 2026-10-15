@@ -187,13 +187,85 @@ ProofLens AI is an enterprise-grade, evidence-first document intelligence platfo
     - [`docs/EVALUATION-GUIDE.md`](file:///Users/apple/Documents/Projects/ProofLense-AI/docs/EVALUATION-GUIDE.md).
 - **Test Metric:** 192/192 passing tests across all backend unit, integration, and evaluation suites (100% pass rate in 11.30s).
 
+#### Phase 10.2: Backend Frontend-Readiness Closure & Cloud Storage Driver (COMPLETED)
+- **Status:** Complete & Committed (`120fe96`).
+- **Core Deliverables:**
+  - Implemented authenticated PDF binary streaming endpoint (`GET /api/v1/workspaces/{workspace_id}/documents/{document_id}/file`).
+  - Implemented page text and chunk detail endpoints (`GET .../pages`, `GET .../chunks/{id}`).
+  - Implemented paginated query and comparison history endpoints (`GET .../queries`, `GET .../comparisons`).
+  - Implemented Supabase Cloud Object Storage driver ([`app/services/storage/supabase.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/storage/supabase.py)) supporting idempotent upsert, streaming download, and deletion.
+  - Complete backend handoff report in [`docs/backend/FRONTEND_HANDOFF_REPORT.md`](file:///Users/apple/Documents/Projects/ProofLense-AI/docs/backend/FRONTEND_HANDOFF_REPORT.md).
+- **Test Metric:** 214/214 passing backend unit and integration tests (100% pass rate in 12.07s).
+
+#### Frontend Phase 0: Design Tokens & Canonical Specifications (COMPLETED)
+- **Status:** Complete & Fully Documented.
+- **Core Deliverables:**
+  - 6 authoritative specifications in [`docs/frontend/`](file:///Users/apple/Documents/Projects/ProofLense-AI/docs/frontend):
+    - `FRONTEND_REQUIREMENTS.md`
+    - `FRONTEND_DESIGN_SYSTEM.md`
+    - `FRONTEND_DESIGN_TOKENS.md`
+    - `FRONTEND_ARCHITECTURE.md`
+    - `FRONTEND_API_INTEGRATION.md`
+    - `FRONTEND_IMPLEMENTATION_ROADMAP.md`
+
+#### Frontend Phases 1–4: Foundation, Workspace Shell, Ingestion & PDF Viewer (COMPLETED)
+- **Status:** Complete & Committed (`06d51c3`).
+- **Core Deliverables:**
+  - Next.js 15 App Router + TypeScript setup with Vanilla CSS tokens ([`tokens.css`](file:///Users/apple/Documents/Projects/ProofLense-AI/frontend/styles/tokens.css), [`globals.css`](file:///Users/apple/Documents/Projects/ProofLense-AI/frontend/styles/globals.css)).
+  - Offline bundled PDF.js worker ([`frontend/public/pdf.worker.min.mjs`](file:///Users/apple/Documents/Projects/ProofLense-AI/frontend/public/pdf.worker.min.mjs), 1.37MB) with zero CDN dependency or data leakage.
+  - Application passkey gatekeeper modal ([`PasskeyModal.tsx`](file:///Users/apple/Documents/Projects/ProofLense-AI/frontend/components/layout/PasskeyModal.tsx)) with `sessionStorage` isolation and automatic `X-Workspace-Key` injection.
+  - Base UI components: `Button`, `Badge`, `Card`, `Input`, `Modal`, `Skeleton`, `Toast`.
+  - Layout shells: `AppHeader`, `Sidebar`, `WorkspaceShell`.
+  - Workspace management: overview dashboard (`app/page.tsx`), workspace creation, workspace detail (`app/workspaces/[id]/page.tsx`).
+  - Document ingestion: `UploadDropzone.tsx` with 10MB validation, `DocumentTable.tsx` with status badges, and polling hook (`useIngestionPolling.ts`).
+  - Authenticated PDF evidence viewer: `AuthenticatedPdfViewer.tsx`, `PageNavigator.tsx`, `ExtractedChunksDrawer.tsx`, and `TextHighlightLayer.tsx` (supporting $\ge 70\%$ word overlap matching).
+- **Test Metric:** WCAG 2.1 AA token contrast tests and component/workflow unit tests passing.
+
+#### Frontend Phases 5–7: Grounded Q&A, Document Comparison & Evaluation Dashboard (COMPLETED)
+- **Status:** Complete & Committed (`ce96151`).
+- **Core Deliverables:**
+  - **Phase 5 (Grounded Q&A):**
+    - `QueryComposer.tsx` (1–2000 chars validation, top_k selector).
+    - `AnswerDisplay.tsx` (grounded answers, explicit abstention alert banner, candidate evidence accordion).
+    - `CitationCard.tsx` (supporting snapshot tombstone citations and direct PDF viewer linking with `page` and `highlight` snippet parameters).
+    - Workspace queries route: [`app/workspaces/[workspaceId]/queries/page.tsx`](file:///Users/apple/Documents/Projects/ProofLense-AI/frontend/app/workspaces/[workspaceId]/queries/page.tsx).
+  - **Phase 6 (Cross-Document Comparison):**
+    - `DocumentSelector.tsx` (2–5 document constraints enforced).
+    - `FindingCard.tsx` (5-part taxonomy badges: agreement, contradiction, unique_finding, inconsistent_data, not_found).
+    - `ComparisonMatrix.tsx` (synthesis, limitations banner, finding filters).
+    - Workspace compare route: [`app/workspaces/[workspaceId]/compare/page.tsx`](file:///Users/apple/Documents/Projects/ProofLense-AI/frontend/app/workspaces/[workspaceId]/compare/page.tsx).
+  - **Phase 7 (Evaluation Dashboard & Hardening):**
+    - `app/evaluation/page.tsx` (transparent presentation of the 25 benchmark cases from `curated_benchmark.json`, 6 core quality metrics, and offline CLI runner instructions).
+    - Independent audit report in [`docs/frontend/PHASES_5_7_FINAL_AUDIT_REPORT.md`](file:///Users/apple/Documents/Projects/ProofLense-AI/docs/frontend/PHASES_5_7_FINAL_AUDIT_REPORT.md).
+- **Test Metric:** 78/78 passing frontend Vitest tests across 14 test suites; Next.js production build verified.
+
+#### Production Cloud Deployment & Resilience Fixes (COMPLETED)
+- **Status:** Live & Operational.
+- **Core Deliverables:**
+  - **Supabase Cloud Database & Storage:**
+    - PostgreSQL 15 instance deployed in `ap-south-1` with `pgvector` extension enabled and `0001_initial_schema` migration applied.
+    - Private bucket `prooflens-documents` configured for authenticated PDF byte streaming.
+  - **Render Backend Web Service:**
+    - Live Web Service at `https://prooflense-ai-rag.onrender.com`.
+    - Health endpoints verified (`/health/live`, `/health/ready` -> `{"status":"ready","database":"connected","pgvector":true}`).
+    - Enhanced `normalize_database_url` in [`app/core/database.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/core/database.py) to automatically rewrite `sslmode=` to `ssl=` for `asyncpg` compatibility (`2bddb73`).
+    - Gatekeeper verified with `X-Workspace-Key` (`200 OK`).
+  - **Vercel Frontend Web App:**
+    - Live Web App at `https://prooflense-ai-rag.vercel.app`.
+    - Upgraded Next.js to `15.5.27` resolving Vercel dependency security block (`9a55862`).
+    - Enhanced `client.ts` to normalize trailing `/api/v1` prefixes in `NEXT_PUBLIC_API_BASE_URL` (`a6bf9b1`).
+    - CORS configured on Render for Vercel origin.
+
 ---
 
 ### Verification Metrics & Git History
 
-- **Test Suite Status:** 192 passed, 0 failed, 0 errors (`.venv/bin/pytest -v`).
-- **Formatting / Code Quality:** 0 lint/whitespace warnings (`git diff --check` clean).
-- **Security Check:** Zero secrets or credentials tracked or staged in git.
+- **Backend Test Suite Status:** 214 passed, 0 failed, 0 errors (`pytest backend/tests/`).
+- **Frontend Test Suite Status:** 78 passed, 0 failed across 14 test suites (`vitest run`).
+- **Next.js Production Build:** 100% compiled & static pages optimized (`next build`).
+- **TypeScript & Linting:** 0 type errors (`tsc --noEmit`), 0 lint warnings (`eslint`).
+- **Offline Evaluation Suite:** 25/25 benchmark cases passed with Hard Quality Gate (`python -m app.services.evaluation.runner --offline`).
+- **Security Check:** Zero secrets or credentials tracked or staged in git (Rule Zero strictly observed).
 - **Git Commit History:**
   - `a11a1d9`: `feat: complete Phase 1 backend foundation`
   - `e5bda30`: `feat: complete Phase 1 backend foundation`
@@ -203,3 +275,11 @@ ProofLens AI is an enterprise-grade, evidence-first document intelligence platfo
   - `308b7f9`: `feat: implement Phase 5 embeddings and vector storage`
   - `3f1766a`: `feat: implement Phase 6 grounded Q&A and Phase 6.1 citation validation audit fixes`
   - `bafa77a`: `feat: implement Phase 7 cross-document comparison and Phase 7.1 evidence sufficiency fixes`
+  - `cd6c9be`: `feat: implement Phase 10 evaluation framework and Phase 10.1 live guard`
+  - `90aef2a`: `docs: update technical debt and completed milestones up to Phase 10.1`
+  - `120fe96`: `feat(backend): close frontend-readiness gaps, endpoints, and storage driver`
+  - `06d51c3`: `feat(frontend): implement phases 1-4 foundation, workspace shell, ingestion and pdf viewer`
+  - `ce96151`: `feat(frontend): implement phases 5-7 grounded q&a, document comparison, and evaluation dashboard`
+  - `2bddb73`: `fix(backend): normalize sslmode to ssl for asyncpg compatibility`
+  - `9a55862`: `fix(frontend): update Next.js to 15.5.27 to resolve Vercel security block`
+  - `a6bf9b1`: `fix(frontend): strip trailing /api/v1 from base url in apiFetch`

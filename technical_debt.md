@@ -42,13 +42,13 @@
 | ID | Item | Severity | Impact | Mitigation / Roadmap |
 |---|---|---|---|---|
 | **TD-01** | **Physical PDF Cleanup on Workspace Deletion** | Medium | `DELETE /api/v1/workspaces/{id}` cascades relational database rows cleanly via foreign keys, but does not currently delete the workspace's physical files in `data/uploads/workspaces/{id}/` from disk. | Add an explicit background folder purge in `delete_workspace_endpoint` or introduce a storage reconciliation sweep worker. |
-| **TD-02** | **Live PostgreSQL Migration & Rollback Verification** | Medium | Alembic migration DDL has been verified via static SQL compilation (`alembic upgrade --sql` / `downgrade --sql`). Live execution against an isolated PostgreSQL instance remains pending. | Spin up an isolated Docker container with PostgreSQL 15+ and pgvector to execute live DDL migrations before production deployment. |
+| **TD-02** | **Live PostgreSQL Migration & Rollback Verification** | Resolved | Live Supabase PostgreSQL execution verified with `vector` extension and `0001_initial_schema` migration applied during Render deployment. | **RESOLVED:** Verified live against Supabase cloud database during deployment. |
 | **TD-03** | **Scanned Image PDFs Lack OCR** | Low (By Design) | Image-only and scanned PDFs yield zero extractable text and fail with `"Document appears to be scanned or contains no extractable text (OCR not supported in MVP)"`. | Working as designed for MVP per PRD; post-MVP roadmap includes Tesseract / Google Cloud Document AI OCR pipeline. |
 | **TD-04** | **In-Process BackgroundTasks vs Distributed Queue** | Low | Document ingestion currently runs via FastAPI's built-in `BackgroundTasks` within the server event loop. If the server restarts during ingestion, the job must wait for `RecoveryWatchdog` to time it out after 600s. | For enterprise scale beyond MVP, transition to a Redis-backed queue (ARQ or Celery) with persistent job states. |
 | **TD-05** | **Encrypted / Password-Protected PDFs** | Low | Encrypted PDFs fail with `PDFParsingError("Malformed or unreadable PDF: ...")`. No UI modal exists to input document passwords. | Documented MVP limitation; future enhancement can support user password inputs during upload. |
 | **TD-06** | **In-Memory Heuristic Rate Limiter** | Low | Sliding-window rate limiter stores request timestamps in memory per IP address. In multi-instance deployments, counters are not shared. | In production multi-pod deployments, transition rate limiting to Redis or edge CDN rate limiting (Cloudflare/Render). |
-| **TD-07** | **Live Cloud Evaluation Adapters** | Low | Evaluation runner intentionally guards `--live` with `NotImplementedError` and exit code 2. Evaluations currently run deterministically against synthetic fixtures (`--offline`). | Provision live database and Gemini API evaluation adapters during Phase 11 production deployment testing. |
-| **TD-08** | **Local Filesystem Storage vs Cloud Object Storage** | Medium | Ingestion pipeline currently stores PDF uploads in local `./data/uploads/` directory. | Implement Supabase Storage or S3-compatible cloud object store driver before multi-pod Render deployment. |
+| **TD-07** | **Live Cloud Evaluation Adapters** | Low | Evaluation runner intentionally guards `--live` with `NotImplementedError` and exit code 2. Evaluations currently run deterministically against synthetic fixtures (`--offline`). | Provision live database and Gemini API evaluation adapters during future post-MVP enterprise test harness expansion. |
+| **TD-08** | **Local Filesystem Storage vs Cloud Object Storage** | Resolved | Supabase Storage cloud object store driver implemented in [`app/services/storage/supabase.py`](file:///Users/apple/Documents/Projects/ProofLense-AI/backend/app/services/storage/supabase.py) with authenticated PDF byte streaming. | **RESOLVED:** Implemented SupabaseStorageService and active in production. |
 
 ---
 
@@ -78,15 +78,32 @@
   - CLI runner with terminal summary tables, JSON reports, and hard quality gate exit codes.
   - 10-vector adversarial prompt injection regression suite (100% attack resistance).
   - Phase 10.1 `--live` safety guard rejecting unprovisioned live connections with actionable exit code 2.
+- **Phase 10.2: Backend Frontend-Readiness Gap Closures [COMPLETED]**
+  - PDF streaming, chunk/page inspection, paginated query/comparison history endpoints.
+  - Supabase Cloud Storage driver with idempotent upserts and byte streaming.
+  - Expanded test suite to 214/214 passing tests.
+- **Frontend Phase 0: Design Tokens & Canonical Specifications [COMPLETED]**
+  - 6 comprehensive architecture documents covering tokens, system, API, and roadmap.
+- **Frontend Phases 1–4: Foundation, Workspace Shell, Ingestion & PDF Viewer [COMPLETED]**
+  - Next.js 15 App Router + TypeScript, Vanilla CSS design tokens.
+  - Offline bundled PDF.js worker (`pdf.worker.min.mjs`, 1.37MB) with zero CDN dependency.
+  - Passkey gatekeeper modal with `sessionStorage` isolation and automatic `X-Workspace-Key` injection.
+  - Drag-and-drop document upload with 10MB validation, document table with status badges and polling.
+  - Authenticated PDF evidence viewer with page navigation, extracted chunks drawer, and substring text matching.
+- **Frontend Phases 5–7: Grounded Q&A, Comparison Matrix & Evaluation Dashboard [COMPLETED]**
+  - Grounded Q&A page with query composer, answer display, and citation cards with tombstone snapshots.
+  - Explicit abstention alert banners and candidate evidence accordion for ungrounded queries.
+  - Cross-Document Comparison page with 2–5 document selector, comparison matrix, and 5-part taxonomy badges.
+  - Evaluation dashboard with benchmark transparency, 25 curated cases, and 6 core quality metrics.
+  - 78/78 passing frontend Vitest tests across 14 test suites.
+- **Phase 11: Production Cloud Deployment & Resilience Fixes [COMPLETED]**
+  - Supabase PostgreSQL with `pgvector` and private storage bucket `prooflens-documents`.
+  - Render Backend live at `https://prooflense-ai-rag.onrender.com` with auto `sslmode` -> `ssl` URL normalizer.
+  - Vercel Frontend live at `https://prooflense-ai-rag.vercel.app` with Next.js 15.5.27 and base URL normalization.
 
-### Upcoming Phases
-- **Phase 8: Next.js Frontend Foundation & Ingestion UI**
-  - Next.js (App Router, TypeScript, Vanilla CSS design tokens).
-  - Workspace manager, drag-and-drop PDF upload, ingestion progress indicators.
-- **Phase 9: Grounded Q&A & Cross-Document Comparison UI**
-  - Evidence & Citation inspector drawer with source text highlight.
-  - Multi-document comparison matrix view.
-- **Phase 11: Deployment Preparation & Production Hardening**
-  - Render backend configuration and Vercel frontend deployment.
-  - Supabase PostgreSQL + pgvector live connection verification.
+### Post-MVP Roadmap & Future Enhancements
+- **Multi-Tenant User Authentication & Team Roles:** Granular RBAC (Admin, Editor, Viewer) beyond single passkey gatekeeper.
+- **OCR Ingestion Pipeline:** Tesseract / Google Document AI integration for scanned and image-only PDFs.
+- **Distributed Ingestion Queue:** Redis + Celery / ARQ worker pool for high-throughput enterprise batch uploads.
+- **Real-Time Streaming Responses:** Server-Sent Events (SSE) for streaming Gemini answer generation.
 
